@@ -2,7 +2,7 @@ name: Build CMake Project and Run Tests
 
 on:
   push:
-    branches: [ "main", "D3D12-Renderer" ]
+    branches: [ "main" ]
   pull_request:
     branches: [ "main" ]
     
