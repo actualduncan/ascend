@@ -22,6 +22,19 @@ set(SOURCES ascend/main.cpp
 			ascend/Renderer.h 
 			ascend/WindowsApplication.cpp 
 			ascend/WindowsApplication.h
+			ascend/imgui/imconfig.h
+			ascend/imgui/imgui.cpp
+			ascend/imgui/imgui.h
+			ascend/imgui/imgui_internal.h
+			ascend/imgui/imgui_demo.cpp
+			ascend/imgui/imgui_draw.cpp
+			ascend/imgui/imgui_tables.cpp
+			ascend/imgui/imgui_widgets.cpp
+			ascend/imgui/imstb_rectpack.h
+			ascend/imgui/imstb_textedit.h
+			ascend/imgui/imstb_truetype.h
+			ascend/imgui/imgui_impl_dx12.cpp
+			ascend/imgui/imgui_impl_dx12.h
 )
 
 set(SHADER_SOURCES ascend/Shader/shaders.hlsl)
