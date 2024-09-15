@@ -1,6 +1,10 @@
 #include "WindowsApplication.h"
 #include "WinUser.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_win32.h"
+#include "imgui/imgui_impl_dx12.h"
 HWND WindowsApplication::m_hwnd = nullptr;
+Renderer* render = nullptr;
 int WindowsApplication::Run(HINSTANCE hInstance, int nCmdShow)
 {
 	WNDCLASSEX windowClass = { 0 };
@@ -28,8 +32,8 @@ int WindowsApplication::Run(HINSTANCE hInstance, int nCmdShow)
         nullptr,        // We aren't using menus.
         hInstance,
         nullptr);
-    Renderer render;
-    render.Initialize();
+    render = new Renderer();
+    render->Initialize();
     ShowWindow(m_hwnd, nCmdShow);
 
     // Main
@@ -54,10 +58,16 @@ LRESULT CALLBACK WindowsApplication::WindowProc(HWND hWnd, UINT message, WPARAM 
     switch (message)
     {
     case WM_DESTROY:
+        render->Shutdown();
         PostQuitMessage(0);
         return 0;
+    case WM_PAINT:
+        render->Update();
     }
 
+    extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+    if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
+        return true;
     // Handle any messages the switch statement didn't.
     return DefWindowProc(hWnd, message, wParam, lParam);
 }

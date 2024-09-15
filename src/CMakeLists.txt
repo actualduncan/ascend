@@ -35,6 +35,8 @@ set(SOURCES ascend/main.cpp
 			ascend/imgui/imstb_truetype.h
 			ascend/imgui/imgui_impl_dx12.cpp
 			ascend/imgui/imgui_impl_dx12.h
+			ascend/imgui/imgui_impl_win32.cpp
+			ascend/imgui/imgui_impl_win32.h
 )
 
 set(SHADER_SOURCES ascend/Shader/shaders.hlsl)
@@ -58,7 +60,7 @@ source_group(TREE ${AGILITY_INCLUDE} PREFIX "ThirdParty/AgilitySDK" FILES ${AGIL
 source_group(TREE ${DXC_INCLUDE} PREFIX "ThirdParty/DXC" FILES ${DXC_HEADERS})
 source_group(TREE ${SHADER_SOURCE_DIR} PREFIX "ShaderSources" FILES ${SHADER_SOURCES})
 
-target_compile_definitions(ascend PRIVATE D3D12_SDK_VERSION_ID=${SDK_VER} SHADER_SRC="${SHADER_SOURCE_REL_DIR}")
+target_compile_definitions(ascend PRIVATE D3D12_SDK_VERSION_ID=${SDK_VER} SHADER_SRC="${SHADER_SOURCE_REL_DIR}", ImTextureID=ImU64)
 target_include_directories(ascend PUBLIC ${CMAKE_CURRENT_LIST_DIR}/Public/ ${AGILITY_INCLUDE} ${DXC_INCLUDE})
 
 target_link_libraries(ascend PRIVATE d3d12.lib dxgi.lib d3dcompiler.lib DXC dxguid.lib)

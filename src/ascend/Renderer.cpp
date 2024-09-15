@@ -1,6 +1,9 @@
 #include "Renderer.h"
 #include <d3dcompiler.h>
 #include "AscendHelpers.h"
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_win32.h"
+#include "imgui/imgui_impl_dx12.h"
 /*
 												WARNING
 	This whole file needs refactoring, this is currently a spike implemnetation of a D3D12 Renderer
@@ -15,6 +18,7 @@ Renderer::Renderer()
 
 Renderer::~Renderer()
 {
+	Shutdown();
 }
 
 bool Renderer::Initialize()
@@ -24,9 +28,17 @@ bool Renderer::Initialize()
 	LoadAssets();
 	return bResult;
 }
-
+//static ID3D12DescriptorHeap* g_pd3dSrvDescHeap = nullptr;
 void Renderer::InitPipeline()
 {
+	// setup Dear ImGui
+	IMGUI_CHECKVERSION();
+	ImGui::CreateContext();
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
+	io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;         // Enable Docking
+	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 	DWORD dxgiFactoryFlags = 0;
 	ComPtr<ID3D12Debug1> m_debugController;
 #if DEBUG
@@ -34,7 +46,7 @@ void Renderer::InitPipeline()
 	if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&m_debugController))))
 	{
 		m_debugController->EnableDebugLayer();
-		m_debugController->SetEnableGPUBasedValidation(true);
+		m_debugController->SetEnableGPUBasedValidation(false);
 		//m_debugController->SetEnableAutoName(true);   <-- ID3D12Debug4 method
 		std::cout << "D3D12 Debug Layer Has Been Enabled" << std::endl;
 	}
@@ -78,12 +90,17 @@ void Renderer::InitPipeline()
 	// create swap chain
 	DXGI_SWAP_CHAIN_DESC1 swapChainDesc = {};
 	swapChainDesc.BufferCount = RendererPrivate::MAX_FRAMES;
-	swapChainDesc.Width = 800;
-	swapChainDesc.Height = 800;
+	swapChainDesc.Width = 0;
+	swapChainDesc.Height = 0;
 	swapChainDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+	swapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT;
 	swapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	swapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
 	swapChainDesc.SampleDesc.Count = 1;
+	swapChainDesc.SampleDesc.Quality = 0;
+	swapChainDesc.AlphaMode = DXGI_ALPHA_MODE_UNSPECIFIED;
+	swapChainDesc.Scaling = DXGI_SCALING_STRETCH;
+	swapChainDesc.Stereo = FALSE;
 	// TODO: Define all descs
 
 	ComPtr<IDXGISwapChain1> tempSwapChain;
@@ -105,7 +122,10 @@ void Renderer::InitPipeline()
 	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
 	VERIFYD3D12RESULT(m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap)));
-	UINT descriptorHeapSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+	m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+
+	// Font Descriptor heap for Dear - ImGui
+
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart());
 
@@ -114,10 +134,23 @@ void Renderer::InitPipeline()
 	{
 		VERIFYD3D12RESULT(m_swapChain->GetBuffer(n, IID_PPV_ARGS(&m_renderTargets[n])));
 		m_device->CreateRenderTargetView(m_renderTargets[n].Get(), nullptr, rtvHandle);
-		rtvHandle.Offset(1, descriptorHeapSize);
+		rtvHandle.Offset(1, m_rtvDescriptorSize);
 	}
 
 	VERIFYD3D12RESULT(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocator)));
+	D3D12_DESCRIPTOR_HEAP_DESC srvHeapDesc = {};
+	srvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+	rtvHeapDesc.NumDescriptors = 1;
+	rtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+	VERIFYD3D12RESULT(m_device->CreateDescriptorHeap(&srvHeapDesc, IID_PPV_ARGS(&m_srvHeap)));
+	//CD3DX12_CPU_DESCRIPTOR_HANDLE srvCpuHandle(m_srvHeap->GetCPUDescriptorHandleForHeapStart());
+	//CD3DX12_GPU_DESCRIPTOR_HANDLE srvGpuHandle(m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+
+	ImGui_ImplWin32_Init(WindowsApplication::GetHwnd());
+	ImGui_ImplDX12_Init(m_device.Get(), RendererPrivate::MAX_FRAMES, DXGI_FORMAT_R8G8B8A8_UNORM,
+		m_srvHeap.Get(),
+		m_srvHeap->GetCPUDescriptorHandleForHeapStart(),
+		m_srvHeap->GetGPUDescriptorHandleForHeapStart());
 }
 void Renderer::LoadAssets()
 {
@@ -214,7 +247,55 @@ void Renderer::LoadAssets()
 
 	WaitForGPU();
 }
+void Renderer::PopulateCommandLists()
+{
+	// Command list allocators can only be reset when the associated 
+	// command lists have finished execution on the GPU; apps should use 
+	// fences to determine GPU execution progress.
+	VERIFYD3D12RESULT(m_commandAllocator->Reset());
 
+	// However, when ExecuteCommandList() is called on a particular command 
+	// list, that command list can then be reset at any time and must be before 
+	// re-recording.
+	VERIFYD3D12RESULT(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+
+	// Set necessary state.
+	m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+	m_commandList->RSSetViewports(1, &m_viewport);
+	m_commandList->RSSetScissorRects(1, &m_scissorRect);
+	CD3DX12_RESOURCE_BARRIER rbarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	// Indicate that the back buffer will be used as a render target.
+	m_commandList->ResourceBarrier(1, &rbarrier);
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+	// Record commands.
+	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
+	m_commandList->DrawInstanced(3, 1, 0, 0);
+	CD3DX12_RESOURCE_BARRIER webarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
+	m_commandList->SetDescriptorHeaps(1, &m_srvHeap);
+	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
+	// Indicate that the back buffer will now be used to present.
+	m_commandList->ResourceBarrier(1, &webarrier);
+
+	VERIFYD3D12RESULT(m_commandList->Close());
+}
+void Renderer::Update()
+{
+	ImGui_ImplDX12_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+	ImGui::ShowDemoWindow();
+	// Rendering
+	// (Your code clears your framebuffer, renders your other stuff etc.)
+	ImGui::Render();
+	PopulateCommandLists();
+	// (Your code calls ExecuteCommandLists, swapchain's Present(), etc.)
+}
 void Renderer::WaitForGPU()
 {
 	// Schedule Signal command
@@ -225,4 +306,11 @@ void Renderer::WaitForGPU()
 	WaitForSingleObjectEx(m_fenceEvent, INFINITE, FALSE);
 
 	++m_fenceValues[m_frameIndex];
+}
+
+void Renderer::Shutdown()
+{
+	ImGui_ImplDX12_Shutdown();
+	ImGui_ImplWin32_Shutdown();
+	ImGui::DestroyContext();
 }
