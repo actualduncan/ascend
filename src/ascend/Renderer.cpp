@@ -192,14 +192,14 @@ void RenderDevice::OnRender()
 
 
 	ImGui::Render();
-	MoveToNextFrame();
-
+	
 	PopulateCommandLists();
+
 	ImGui::UpdatePlatformWindows();
 	ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
 	VERIFYD3D12RESULT(m_swapChain->Present(1, 0));
 
-	
+	MoveToNextFrame();
 	// (Your code calls ExecuteCommandLists, swapchain's Present(), etc.)
 }
 void RenderDevice::PopulateCommandLists()
