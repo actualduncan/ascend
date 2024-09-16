@@ -1,10 +1,9 @@
 #include "WindowsApplication.h"
 #include "WinUser.h"
-#include "imgui/imgui.h"
-#include "imgui/imgui_impl_win32.h"
-#include "imgui/imgui_impl_dx12.h"
+
 HWND WindowsApplication::m_hwnd = nullptr;
-Renderer* render = nullptr;
+//Renderer* render = nullptr;
+/*
 int WindowsApplication::Run(HINSTANCE hInstance, int nCmdShow)
 {
 	WNDCLASSEX windowClass = { 0 };
@@ -32,9 +31,9 @@ int WindowsApplication::Run(HINSTANCE hInstance, int nCmdShow)
         nullptr,        // We aren't using menus.
         hInstance,
         nullptr);
-    render = new Renderer();
-    render->Initialize();
-    ShowWindow(m_hwnd, nCmdShow);
+    //render = new Renderer();
+    //render->Initialize();
+    //ShowWindow(m_hwnd, nCmdShow);
 
     // Main
         // Main sample loop.
@@ -71,3 +70,4 @@ LRESULT CALLBACK WindowsApplication::WindowProc(HWND hWnd, UINT message, WPARAM 
     // Handle any messages the switch statement didn't.
     return DefWindowProc(hWnd, message, wParam, lParam);
 }
+*/
