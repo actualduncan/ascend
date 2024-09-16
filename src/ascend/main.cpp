@@ -11,7 +11,7 @@ bool CreateWindowsApplication(int wHeight, int wWidth, HINSTANCE hInstance, int 
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
-    if(CreateWindowsApplication(600, 600, hInstance, nCmdShow))
+    if(CreateWindowsApplication(1280, 800, hInstance, nCmdShow))
     {
         IMGUI_CHECKVERSION();
         ImGui::CreateContext();
@@ -19,33 +19,41 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-
+        io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
         ImGui_ImplWin32_Init(hwnd);
         Device = new RenderDevice();
         Device->Initialize(hwnd);
         // Application loop
-        MSG msg = {};
-        while (msg.message != WM_QUIT)
+        bool done = false;
+        while (!done)
         {
-            // Process any messages in the queue.
-            if (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE))
+            MSG msg = {};
+            while (::PeekMessage(&msg, nullptr, 0U, 0U, PM_REMOVE))
             {
-                TranslateMessage(&msg);
-                DispatchMessage(&msg);
+                // Process any messages in the queue.
+                ::TranslateMessage(&msg);
+                ::DispatchMessage(&msg);
+                if (msg.message == WM_QUIT)
+                    done = true;
             }
+            if (done)
+                break;
+
+            Device->OnRender();
         }
+        return 0;
+
 
         // Return this part of the WM_QUIT message to Windows.
-        return static_cast<char>(msg.wParam);;
+        
     }
    
     return 0;
 }
-
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 
-    extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
     if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
         return true;
 
@@ -55,7 +63,7 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         PostQuitMessage(0);
         return 0;
     case WM_PAINT:
-        Device->OnRender();
+        
         break;
     }
     return DefWindowProc(hWnd, message, wParam, lParam);

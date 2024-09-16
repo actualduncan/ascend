@@ -189,19 +189,63 @@ void RenderDevice::OnRender()
 	ImGui::NewFrame();
 	ImGui::ShowDemoWindow();
 
-	PopulateCommandLists();
+
 
 	ImGui::Render();
-	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
+	MoveToNextFrame();
 
+	PopulateCommandLists();
+	ImGui::UpdatePlatformWindows();
+	ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
 	VERIFYD3D12RESULT(m_swapChain->Present(1, 0));
 
-	MoveToNextFrame();
+	
 	// (Your code calls ExecuteCommandLists, swapchain's Present(), etc.)
 }
 void RenderDevice::PopulateCommandLists()
 {
+	// Command list allocators can only be reset when the associated 
+// command lists have finished execution on the GPU; apps should use 
+// fences to determine GPU execution progress.
+	//VERIFYD3D12RESULT(m_commandAllocators[0]->Reset());
 
+	// However, when ExecuteCommandList() is called on a particular command 
+	// list, that command list can then be reset at any time and must be before 
+	// re-recording.
+
+	// Set necessary state.
+	//m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
+	//m_commandList->RSSetViewports(1, &m_viewport);
+	//m_commandList->RSSetScissorRects(1, &m_scissorRect);
+	D3D12_RESOURCE_BARRIER barrier = {};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	barrier.Transition.pResource = m_renderTargets[m_frameIndex].Get();
+	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	// = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	// Indicate that the back buffer will be used as a render target.
+	VERIFYD3D12RESULT(m_commandList->Reset(m_commandAllocators[0].Get(), nullptr));
+	m_commandList->ResourceBarrier(1, &barrier);
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+	// Record commands.
+	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+	m_commandList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
+	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
+	m_commandList->ResourceBarrier(1, &barrier);
+	m_commandList->Close();
+	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+	//VERIFYD3D12RESULT(m_commandList->Close());
 }
 void RenderDevice::WaitForGPU()
 {

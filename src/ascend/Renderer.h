@@ -49,7 +49,7 @@ private:
 	ComPtr<IDXGISwapChain4> m_swapChain;
 	ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
 	ComPtr<ID3D12DescriptorHeap> m_srvHeap;
-	ComPtr<ID3D12Resource2> m_renderTargets[RendererPrivate::MAX_FRAMES];
+	ComPtr<ID3D12Resource> m_renderTargets[RendererPrivate::MAX_FRAMES];
 	D3D12_CPU_DESCRIPTOR_HANDLE  m_renderTargetDescriptors[RendererPrivate::MAX_FRAMES] = {};
 	ComPtr<ID3D12CommandQueue> m_commandQueue;
 	ComPtr<ID3D12RootSignature> m_rootSignature;
