@@ -154,6 +154,7 @@ void Renderer::InitPipeline()
 }
 void Renderer::LoadAssets()
 {
+	/*
 	// Create Empty root singature
 	CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
 	rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
@@ -233,8 +234,12 @@ void Renderer::LoadAssets()
 	m_vertexBufferView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
 	m_vertexBufferView.StrideInBytes = sizeof(XMFLOAT3);
 	m_vertexBufferView.SizeInBytes = vertexBufferSize;
-
+	*/
 	// syncro objects (fences)
+	VERIFYD3D12RESULT(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocator.Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
+
+	// Closing command list to not record work
+	VERIFYD3D12RESULT(m_commandList->Close());
 
 	VERIFYD3D12RESULT(m_device->CreateFence(m_fenceValues[m_frameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
 	++m_fenceValues[m_frameIndex];
@@ -257,32 +262,36 @@ void Renderer::PopulateCommandLists()
 	// However, when ExecuteCommandList() is called on a particular command 
 	// list, that command list can then be reset at any time and must be before 
 	// re-recording.
-	VERIFYD3D12RESULT(m_commandList->Reset(m_commandAllocator.Get(), m_pipelineState.Get()));
+	
+	
+	
 
+	D3D12_RESOURCE_BARRIER barrier = {};
+	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+	barrier.Transition.pResource = m_renderTargets[m_frameIndex].Get();
+	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	VERIFYD3D12RESULT(m_commandList->Reset(m_commandAllocator.Get(), nullptr));
+	m_commandList->ResourceBarrier(1, &barrier);
 	// Set necessary state.
-	m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-	m_commandList->RSSetViewports(1, &m_viewport);
-	m_commandList->RSSetScissorRects(1, &m_scissorRect);
-	CD3DX12_RESOURCE_BARRIER rbarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	// Indicate that the back buffer will be used as a render target.
-	m_commandList->ResourceBarrier(1, &rbarrier);
-
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-
-	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-	m_commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	m_commandList->IASetVertexBuffers(0, 1, &m_vertexBufferView);
-	m_commandList->DrawInstanced(3, 1, 0, 0);
-	CD3DX12_RESOURCE_BARRIER webarrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_PRESENT);
-	m_commandList->SetDescriptorHeaps(1, &m_srvHeap);
+
+	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+	m_commandList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
+	// Record commands.
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
+
+	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
+	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 	// Indicate that the back buffer will now be used to present.
-	m_commandList->ResourceBarrier(1, &webarrier);
+	m_commandList->ResourceBarrier(1, &barrier);
 
 	VERIFYD3D12RESULT(m_commandList->Close());
+
 }
 void Renderer::Update()
 {
@@ -294,7 +303,15 @@ void Renderer::Update()
 	// (Your code clears your framebuffer, renders your other stuff etc.)
 	ImGui::Render();
 	PopulateCommandLists();
-	// (Your code calls ExecuteCommandLists, swapchain's Present(), etc.)
+	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+	ImGui::UpdatePlatformWindows();
+	ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
+
+	m_swapChain->Present(0, 1);
+	WaitForGPU();
+
 }
 void Renderer::WaitForGPU()
 {
