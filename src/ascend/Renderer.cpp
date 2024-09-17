@@ -1,9 +1,9 @@
 #include "Renderer.h"
 #include <d3dcompiler.h>
 #include "AscendHelpers.h"
-#include "imgui/imgui.h"
-#include "imgui/imgui_impl_win32.h"
-#include "imgui/imgui_impl_dx12.h"
+#include "UserInterface/imgui/imgui.h"
+#include "UserInterface/imgui/imgui_impl_win32.h"
+#include "UserInterface/imgui/imgui_impl_dx12.h"
 /*
 												WARNING
 	This whole file needs refactoring, this is currently a spike implemnetation of a D3D12 Renderer

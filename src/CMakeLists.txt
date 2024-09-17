@@ -22,21 +22,26 @@ set(SOURCES ascend/main.cpp
 			ascend/Renderer.h 
 			ascend/WindowsApplication.cpp 
 			ascend/WindowsApplication.h
-			ascend/imgui/imconfig.h
-			ascend/imgui/imgui.cpp
-			ascend/imgui/imgui.h
-			ascend/imgui/imgui_internal.h
-			ascend/imgui/imgui_demo.cpp
-			ascend/imgui/imgui_draw.cpp
-			ascend/imgui/imgui_tables.cpp
-			ascend/imgui/imgui_widgets.cpp
-			ascend/imgui/imstb_rectpack.h
-			ascend/imgui/imstb_textedit.h
-			ascend/imgui/imstb_truetype.h
-			ascend/imgui/imgui_impl_dx12.cpp
-			ascend/imgui/imgui_impl_dx12.h
-			ascend/imgui/imgui_impl_win32.cpp
-			ascend/imgui/imgui_impl_win32.h
+			ascend/UserInterface/UserInterface.cpp
+			ascend/UserInterface/UserInterface.h
+			ascend/UserInterface/UserInterfaceModuleInterface.h
+			ascend/UserInterface/Modules/GraphicsUserInterfaceModule.cpp
+			ascend/UserInterface/Modules/GraphicsUserInterfaceModule.h
+			ascend/UserInterface/imgui/imconfig.h
+			ascend/UserInterface/imgui/imgui.cpp
+			ascend/UserInterface/imgui/imgui.h
+			ascend/UserInterface/imgui/imgui_internal.h
+			ascend/UserInterface/imgui/imgui_demo.cpp
+			ascend/UserInterface/imgui/imgui_draw.cpp
+			ascend/UserInterface/imgui/imgui_tables.cpp
+			ascend/UserInterface/imgui/imgui_widgets.cpp
+			ascend/UserInterface/imgui/imstb_rectpack.h
+			ascend/UserInterface/imgui/imstb_textedit.h
+			ascend/UserInterface/imgui/imstb_truetype.h
+			ascend/UserInterface/imgui/imgui_impl_dx12.cpp
+			ascend/UserInterface/imgui/imgui_impl_dx12.h
+			ascend/UserInterface/imgui/imgui_impl_win32.cpp
+			ascend/UserInterface/imgui/imgui_impl_win32.h
 )
 
 set(SHADER_SOURCES ascend/Shader/shaders.hlsl)
