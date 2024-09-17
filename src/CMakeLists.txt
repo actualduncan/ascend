@@ -66,7 +66,7 @@ source_group(TREE ${DXC_INCLUDE} PREFIX "ThirdParty/DXC" FILES ${DXC_HEADERS})
 source_group(TREE ${SHADER_SOURCE_DIR} PREFIX "ShaderSources" FILES ${SHADER_SOURCES})
 
 target_compile_definitions(ascend PRIVATE D3D12_SDK_VERSION_ID=${SDK_VER} SHADER_SRC="${SHADER_SOURCE_REL_DIR}", ImTextureID=ImU64)
-target_include_directories(ascend PUBLIC ${CMAKE_CURRENT_LIST_DIR}/Public/ ${AGILITY_INCLUDE} ${DXC_INCLUDE})
+target_include_directories(ascend PUBLIC . ${CMAKE_CURRENT_LIST_DIR}/Public/ ${AGILITY_INCLUDE} ${DXC_INCLUDE})
 
 target_link_libraries(ascend PRIVATE d3d12.lib dxgi.lib d3dcompiler.lib DXC dxguid.lib)
 
