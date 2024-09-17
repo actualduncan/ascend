@@ -32,15 +32,6 @@ public:
 	void MoveToNextFrame();
 	void PopulateCommandLists();
 	void OnRender();
-	/*
-	void InitPipeline();
-	void LoadAssets();
-	
-	void GetDevice();
-	void Update();
-	void PopulateCommandLists();
-	void Shutdown();
-	*/
 private:
 	FrameContext m_frameContext[RendererPrivate::MAX_FRAMES];
 	ComPtr<ID3D12Device> m_device;
