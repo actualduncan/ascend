@@ -1,10 +1,5 @@
 #include "GraphicsUserInterfaceModule.h"
-
-ImGuiGraphicsUserInterfaceModule::ImGuiGraphicsUserInterfaceModule()
-{
-
-}
-
+#include <ascend/UserInterface/imgui/imgui.h>
 ImGuiGraphicsUserInterfaceModule::~ImGuiGraphicsUserInterfaceModule()
 {
 
@@ -12,5 +7,6 @@ ImGuiGraphicsUserInterfaceModule::~ImGuiGraphicsUserInterfaceModule()
 
 void ImGuiGraphicsUserInterfaceModule::Initialize()
 {
-
+	bool yip = true;
+	ImGui::Checkbox("test", &yip);
 }

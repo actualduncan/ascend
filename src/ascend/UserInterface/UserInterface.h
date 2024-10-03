@@ -12,6 +12,6 @@ public:
 
 	void Initialize();
 private:
-	std::vector<std::unique_ptr<ImGuiUserInterfaceModule>> UserInterfaceModules;
+	std::vector<ImGuiUserInterfaceModule*> UserInterfaceModules;
 };
 

@@ -5,6 +5,7 @@
 #include "Renderer.h"
 #include "UserInterface/imgui/imgui.h"
 #include "UserInterface/imgui/imgui_impl_win32.h"
+
 static HWND hwnd = NULL;
 RenderDevice* Device = nullptr;
 bool CreateWindowsApplication(int wHeight, int wWidth, HINSTANCE hInstance, int nCmdShow);
@@ -23,6 +24,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
         ImGui_ImplWin32_Init(hwnd);
         Device = new RenderDevice();
         Device->Initialize(hwnd);
+
         // Application loop
         bool done = false;
         while (!done)
@@ -40,6 +42,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
                 break;
 
             Device->OnRender();
+
         }
         return 0;
 

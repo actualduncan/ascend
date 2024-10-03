@@ -4,6 +4,7 @@
 #include "UserInterface/imgui/imgui.h"
 #include "UserInterface/imgui/imgui_impl_win32.h"
 #include "UserInterface/imgui/imgui_impl_dx12.h"
+#include "UserInterface/UserInterface.h"
 /*
 												WARNING
 	This whole file needs refactoring, this is currently a spike implemnetation of a D3D12 Renderer
@@ -21,7 +22,7 @@ RenderDevice::~RenderDevice()
 	
 	//Shutdown();
 }
-
+ImGuiUserInterface* userInterface = new ImGuiUserInterface();
 bool RenderDevice::Initialize(HWND hwnd)
 {
 
@@ -182,6 +183,7 @@ bool RenderDevice::Initialize(HWND hwnd)
 	WaitForGPU();
 	return true;
 }
+
 void RenderDevice::OnRender()
 {
 	ImGui_ImplDX12_NewFrame();
@@ -189,7 +191,7 @@ void RenderDevice::OnRender()
 	ImGui::NewFrame();
 	ImGui::ShowDemoWindow();
 
-
+	userInterface->Initialize();
 
 	ImGui::Render();
 	

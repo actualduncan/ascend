@@ -12,7 +12,7 @@ ImGuiUserInterface::~ImGuiUserInterface()
 
 void ImGuiUserInterface::Initialize()
 {
-	UserInterfaceModules.push_back(std::make_unique<ImGuiGraphicsUserInterfaceModule>());
+	UserInterfaceModules.push_back(new ImGuiGraphicsUserInterfaceModule());
 
 	for (auto&& module : UserInterfaceModules)
 	{
