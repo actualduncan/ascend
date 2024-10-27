@@ -94,10 +94,6 @@ bool RenderDevice::Initialize(HWND hwnd)
 		VERIFYD3D12RESULT(m_device->CreateCommandQueue(&desc, IID_PPV_ARGS(&m_commandQueue)));
 	}
 
-
-	//ThrowIfFailed(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[m_frameIndex].Get(), m_pipelineState.Get(), IID_PPV_ARGS(&m_commandList)));
-
-
 	{
 		ComPtr<IDXGISwapChain1> swapChain1;
 
@@ -106,11 +102,8 @@ bool RenderDevice::Initialize(HWND hwnd)
 		VERIFYD3D12RESULT(m_factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
 		VERIFYD3D12RESULT(swapChain1.As(&m_swapChain)); // seems like you can only create a swapchain1. Therefore to get currentBackbuffer
 
-		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 		VERIFYD3D12RESULT(swapChain1->QueryInterface(IID_PPV_ARGS(&m_swapChain)));
-		//swapChain1->Release();
-		//m_swapChain->SetMaximumFrameLatency(RendererPrivate::MAX_FRAMES);
-		//m_SwapChainWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
+
 		m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 	}
 
@@ -153,7 +146,6 @@ bool RenderDevice::Initialize(HWND hwnd)
 		m_srvHeap->GetCPUDescriptorHandleForHeapStart(),
 		m_srvHeap->GetGPUDescriptorHandleForHeapStart());
 
-
 	// syncro objects (fences)
 
 	VERIFYD3D12RESULT(m_device->CreateFence(m_fenceValues[m_frameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
@@ -164,17 +156,7 @@ bool RenderDevice::Initialize(HWND hwnd)
 	{
 		VERIFYD3D12RESULT(HRESULT_FROM_WIN32(GetLastError()));
 	}
-	
 
-	/*
-	for (UINT i = 0; i < RendererPrivate::MAX_FRAMES; i++)
-	{
-		ID3D12Resource* pBackBuffer = nullptr;
-		m_swapChain->GetBuffer(i, IID_PPV_ARGS(&pBackBuffer));
-		m_device->CreateRenderTargetView(pBackBuffer, nullptr, m_renderTargetDescriptors[i]);
-		m_renderTargets[i] = pBackBuffer;
-	}
-	*/
 
 	VERIFYD3D12RESULT(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[m_frameIndex].Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
 	m_commandList->Close();
@@ -189,34 +171,26 @@ void RenderDevice::OnRender()
 	ImGui::NewFrame();
 	ImGui::ShowDemoWindow();
 
-
-
 	ImGui::Render();
 	
 	PopulateCommandLists();
 
 	ImGui::UpdatePlatformWindows();
 	ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
+
+	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
+	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
 	VERIFYD3D12RESULT(m_swapChain->Present(1, 0));
 
 	MoveToNextFrame();
-	// (Your code calls ExecuteCommandLists, swapchain's Present(), etc.)
 }
 void RenderDevice::PopulateCommandLists()
 {
-	// Command list allocators can only be reset when the associated 
-// command lists have finished execution on the GPU; apps should use 
-// fences to determine GPU execution progress.
-	//VERIFYD3D12RESULT(m_commandAllocators[0]->Reset());
 
-	// However, when ExecuteCommandList() is called on a particular command 
-	// list, that command list can then be reset at any time and must be before 
-	// re-recording.
+	VERIFYD3D12RESULT(m_commandAllocators[m_frameIndex]->Reset());
 
-	// Set necessary state.
-	//m_commandList->SetGraphicsRootSignature(m_rootSignature.Get());
-	//m_commandList->RSSetViewports(1, &m_viewport);
-	//m_commandList->RSSetScissorRects(1, &m_scissorRect);
+
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -224,9 +198,8 @@ void RenderDevice::PopulateCommandLists()
 	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-	// = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_PRESENT, D3D12_RESOURCE_STATE_RENDER_TARGET);
-	// Indicate that the back buffer will be used as a render target.
-	VERIFYD3D12RESULT(m_commandList->Reset(m_commandAllocators[0].Get(), nullptr));
+
+	VERIFYD3D12RESULT(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
 	m_commandList->ResourceBarrier(1, &barrier);
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
@@ -237,15 +210,16 @@ void RenderDevice::PopulateCommandLists()
 	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 	m_commandList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
+
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
+
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
-	m_commandList->ResourceBarrier(1, &barrier);
-	m_commandList->Close();
-	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
-	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
 
-	//VERIFYD3D12RESULT(m_commandList->Close());
+	m_commandList->ResourceBarrier(1, &barrier);
+
+	m_commandList->Close();
+
 }
 void RenderDevice::WaitForGPU()
 {

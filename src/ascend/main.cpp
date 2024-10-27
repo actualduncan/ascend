@@ -20,9 +20,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
         io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
         io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
         io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
+
         ImGui_ImplWin32_Init(hwnd);
         Device = new RenderDevice();
         Device->Initialize(hwnd);
+
         // Application loop
         bool done = false;
         while (!done)
@@ -42,7 +44,6 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
             Device->OnRender();
         }
         return 0;
-
 
         // Return this part of the WM_QUIT message to Windows.
         
