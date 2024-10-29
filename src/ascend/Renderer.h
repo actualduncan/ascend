@@ -49,6 +49,7 @@ private:
 
 	ComPtr<ID3D12Device5> m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
+	ComPtr<ID3D12RootSignature> m_raytracingRootSignature;
 	// others
 	ComPtr<ID3D12Device> m_device;
 	ComPtr<IDXGIAdapter4> m_adapter;

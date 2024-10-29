@@ -173,7 +173,31 @@ void RenderDevice::CreateRaytracingInterfaces()
 
 void RenderDevice::CreateRootSignatures()
 {
+	{
+		CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
+		UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+		CD3DX12_ROOT_PARAMETER rootParameters[2];
+		rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
+		rootParameters[1].InitAsShaderResourceView(0);
+		CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
+		
+		ComPtr<ID3DBlob> blob;
+		ComPtr<ID3DBlob> error;
+		VERIFYD3D12RESULT(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error));
+		VERIFYD3D12RESULT(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&m_raytracingRootSignature)));
+	}
 
+	{
+		CD3DX12_ROOT_PARAMETER rootParameters[1];
+		rootParameters[0].InitAsConstants(1, &UAVDescriptor);
+		CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
+
+		ComPtr<ID3DBlob> blob;
+		ComPtr<ID3DBlob> error;
+		VERIFYD3D12RESULT(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error));
+		VERIFYD3D12RESULT(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&m_raytracingRootSignature)));
+	}
+	
 }
 
 void RenderDevice::CreateRaytracingPSO()

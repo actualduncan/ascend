@@ -39,7 +39,10 @@ set(SOURCES ascend/main.cpp
 			ascend/imgui/imgui_impl_win32.h
 )
 
-set(SHADER_SOURCES ascend/Shader/shaders.hlsl)
+set(SHADER_SOURCES ascend/Shader/shaders.hlsl
+		   ascend/Shader/HlslCompat.h
+		   ascend/Shader/RaytracingHlslCompat.h
+	 	   ascend/Shader/Raytacing.hlsl)
 
 set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ascend/Shader)
 set(SHADER_SOURCE_REL_DIR "Shaders")
