@@ -32,8 +32,24 @@ public:
 	void MoveToNextFrame();
 	void PopulateCommandLists();
 	void OnRender();
+	void BuildGeometry();
 private:
+
+	
 	FrameContext m_frameContext[RendererPrivate::MAX_FRAMES];
+
+	// Raytracing
+	void CreateRaytracingInterfaces();
+	void CreateRootSignatures();
+	void CreateRaytracingPSO();
+	void CreateDescriptorHeap();
+	void BuildAccelerationStructures();
+	void BuildShaderTables();
+	void CreateRaytracingOutputResource();
+
+	ComPtr<ID3D12Device5> m_dxrDevice;
+	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
+	// others
 	ComPtr<ID3D12Device> m_device;
 	ComPtr<IDXGIAdapter4> m_adapter;
 

@@ -164,6 +164,48 @@ bool RenderDevice::Initialize(HWND hwnd)
 	WaitForGPU();
 	return true;
 }
+
+void RenderDevice::CreateRaytracingInterfaces()
+{
+	VERIFYD3D12RESULT(m_device->QueryInterface(IID_PPV_ARGS(&m_dxrDevice)));
+	VERIFYD3D12RESULT(m_commandList->QueryInterface(IID_PPV_ARGS(&m_dxrCommandList)));
+}
+
+void RenderDevice::CreateRootSignatures()
+{
+
+}
+
+void RenderDevice::CreateRaytracingPSO()
+{
+
+}
+
+void RenderDevice::CreateDescriptorHeap()
+{
+
+}
+
+void RenderDevice::BuildGeometry()
+{
+
+}
+
+void RenderDevice::BuildAccelerationStructures()
+{
+
+}
+
+void RenderDevice::BuildShaderTables()
+{
+
+}
+
+void RenderDevice::CreateRaytracingOutputResource()
+{
+
+}
+
 void RenderDevice::OnRender()
 {
 	ImGui_ImplDX12_NewFrame();

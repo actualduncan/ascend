@@ -401,3 +401,6 @@ FodyWeavers.xsd
 
 # Nuget files
 [Ss]rc/nuget/
+
+# Obsidian
+.obsidian/*
