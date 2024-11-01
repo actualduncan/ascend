@@ -189,7 +189,7 @@ void RenderDevice::CreateRootSignatures()
 
 	{
 		CD3DX12_ROOT_PARAMETER rootParameters[1];
-		rootParameters[0].InitAsConstants(1, &UAVDescriptor);
+		rootParameters[0].InitAsConstants(SizeOfInUint32(m_rayGenCB), 0, 0);
 		CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
 
 		ComPtr<ID3DBlob> blob;

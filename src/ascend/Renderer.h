@@ -5,6 +5,7 @@
 #include <d3dx12/d3dx12.h> // include d3d
 #include <wrl.h>
 #include <DirectXMath.h>
+#include "DirectXRaytracingHelper.h"
 //#include "WindowsApplication.h"
 
 using namespace Microsoft::WRL;
@@ -14,6 +15,19 @@ namespace RendererPrivate
 {
 	constexpr uint8_t MAX_FRAMES = 3;
 
+	struct Viewport
+	{
+		float left;
+		float top;
+		float right;
+		float bottom;
+	};
+
+	struct RayGenConstantBuffer
+	{
+		Viewport viewport;
+		Viewport stencil;
+	};
 }
 
 struct FrameContext
@@ -50,6 +64,7 @@ private:
 	ComPtr<ID3D12Device5> m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
 	ComPtr<ID3D12RootSignature> m_raytracingRootSignature;
+	RendererPrivate::RayGenConstantBuffer m_rayGenCB;
 	// others
 	ComPtr<ID3D12Device> m_device;
 	ComPtr<IDXGIAdapter4> m_adapter;
