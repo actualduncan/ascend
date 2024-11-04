@@ -203,7 +203,44 @@ bool RenderDevice::Initialize(HWND hwnd)
 	m_commandList->Close();
 
 	WaitForGPU();
+	CreateDeviceDependentResources();
 	return true;
+}
+void RenderDevice::CreateDeviceDependentResources()
+{
+	// Initialize raytracing pipeline.
+
+// Create raytracing interfaces: raytracing device and commandlist.
+	CreateRaytracingInterfaces();
+
+	// Create root signatures for the shaders.
+	CreateRootSignatures();
+
+	// Create a raytracing pipeline state object which defines the binding of shaders, state and resources to be used during raytracing.
+	CreateRaytracingPSO();
+
+	// Create a heap for descriptors.
+	CreateDescriptorHeap();
+
+	// Build geometry to be used in the sample.
+	BuildGeometry();
+
+	// Build raytracing acceleration structures from the generated geometry.
+	BuildAccelerationStructures();
+
+	// Build shader tables, which define shaders and their local root arguments.
+	BuildShaderTables();
+
+	// Create an output 2D texture to store the raytracing result to.
+	CreateRaytracingOutputResource();
+}
+
+void RenderDevice::CreateWindowSizeDependentResources()
+{
+	CreateRaytracingOutputResource();
+
+	// For simplicity, we will rebuild the shader tables.
+	BuildShaderTables();
 }
 
 void RenderDevice::CreateRaytracingInterfaces()
@@ -231,11 +268,11 @@ void RenderDevice::CreateRootSignatures()
 	{
 		CD3DX12_ROOT_PARAMETER rootParameters[1];
 		rootParameters[0].InitAsConstants(SizeOfInUint32(m_rayGenCB), 0, 0);
-		CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
-
+		CD3DX12_ROOT_SIGNATURE_DESC localRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
+		localRootSignatureDesc.Flags = D3D12_ROOT_SIGNATURE_FLAG_LOCAL_ROOT_SIGNATURE;
 		ComPtr<ID3DBlob> blob;
 		ComPtr<ID3DBlob> error;
-		VERIFYD3D12RESULT(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error));
+		VERIFYD3D12RESULT(D3D12SerializeRootSignature(&localRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error));
 		VERIFYD3D12RESULT(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&m_raytracingLocalRootSignature)));
 	}
 	
@@ -511,7 +548,20 @@ void RenderDevice::BuildShaderTables()
 
 void RenderDevice::CreateRaytracingOutputResource()
 {
+	// Create the output resource. The dimensions and format should match the swap-chain.
+	auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
+	auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+	VERIFYD3D12RESULT(m_device->CreateCommittedResource(
+		&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_raytracingOutput)));
+	NAME_D3D12_OBJECT(m_raytracingOutput);
+
+	D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle;
+	m_raytracingOutputResourceUAVDescriptorHeapIndex = AllocateDescriptor(&uavDescriptorHandle, m_raytracingOutputResourceUAVDescriptorHeapIndex);
+	D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
+	UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+	m_device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
+	m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), m_raytracingOutputResourceUAVDescriptorHeapIndex, m_descriptorSize);
 }
 
 void RenderDevice::OnRender()
@@ -600,4 +650,15 @@ void RenderDevice::MoveToNextFrame()
 
 	// Set the fence value for the next frame.
 	m_fenceValues[m_frameIndex] = currentFenceValue + 1;
+}
+
+UINT RenderDevice::AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* cpuDescriptor, UINT descriptorIndexToUse)
+{
+	auto descriptorHeapCpuBase = m_descriptorHeap->GetCPUDescriptorHandleForHeapStart();
+	if (descriptorIndexToUse >= m_descriptorHeap->GetDesc().NumDescriptors)
+	{
+		descriptorIndexToUse = m_descriptorsAllocated++;
+	}
+	*cpuDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, descriptorIndexToUse, m_descriptorSize);
+	return descriptorIndexToUse;
 }

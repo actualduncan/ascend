@@ -39,6 +39,11 @@ private:
 	
 	FrameContext m_frameContext[RendererPrivate::MAX_FRAMES];
 
+	// Viewport dimensions.
+	UINT m_width = 1280;
+	UINT m_height = 800;
+	float m_aspectRatio;
+
 	// Raytracing
 	void CreateRaytracingInterfaces();
 	void CreateRootSignatures();
@@ -48,16 +53,21 @@ private:
 	void BuildShaderTables();
 	void CreateRaytracingOutputResource();
 	void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
+	void CreateDeviceDependentResources();
+	void CreateWindowSizeDependentResources();
+	UINT AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* cpuDescriptor, UINT descriptorIndexToUse);
 	ComPtr<ID3D12Device5> m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
 	ComPtr<ID3D12StateObject> m_dxrStateObject;
+
 	// Root signatures
 	ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
 	ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature;
 	RayGenConstantBuffer m_rayGenCB;
+
 	// descriptors
 	ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
-	UINT m_descriptorsAllocated;
+	UINT m_descriptorsAllocated = 0;
 	UINT m_descriptorSize;
 
 	typedef UINT16 Index;
@@ -78,6 +88,11 @@ private:
 	ComPtr<ID3D12Resource> m_missShaderTable;
 	ComPtr<ID3D12Resource> m_hitGroupShaderTable;
 	ComPtr<ID3D12Resource> m_rayGenShaderTable;
+
+	// Raytracing output
+	ComPtr<ID3D12Resource> m_raytracingOutput;
+	D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
+	UINT m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
 
 	// others
 	ComPtr<ID3D12Device> m_device;
