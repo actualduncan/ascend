@@ -5,7 +5,7 @@
 #include <d3dx12/d3dx12.h> // include d3d
 #include <wrl.h>
 #include <DirectXMath.h>
-#include "DirectXRaytracingHelper.h"
+#include "Shader/RaytracingHlslCompat.h"
 //#include "WindowsApplication.h"
 
 using namespace Microsoft::WRL;
@@ -15,19 +15,6 @@ namespace RendererPrivate
 {
 	constexpr uint8_t MAX_FRAMES = 3;
 
-	struct Viewport
-	{
-		float left;
-		float top;
-		float right;
-		float bottom;
-	};
-
-	struct RayGenConstantBuffer
-	{
-		Viewport viewport;
-		Viewport stencil;
-	};
 }
 
 struct FrameContext
@@ -60,11 +47,38 @@ private:
 	void BuildAccelerationStructures();
 	void BuildShaderTables();
 	void CreateRaytracingOutputResource();
-
+	void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
 	ComPtr<ID3D12Device5> m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
-	ComPtr<ID3D12RootSignature> m_raytracingRootSignature;
-	RendererPrivate::RayGenConstantBuffer m_rayGenCB;
+	ComPtr<ID3D12StateObject> m_dxrStateObject;
+	// Root signatures
+	ComPtr<ID3D12RootSignature> m_raytracingGlobalRootSignature;
+	ComPtr<ID3D12RootSignature> m_raytracingLocalRootSignature;
+	RayGenConstantBuffer m_rayGenCB;
+	// descriptors
+	ComPtr<ID3D12DescriptorHeap> m_descriptorHeap;
+	UINT m_descriptorsAllocated;
+	UINT m_descriptorSize;
+
+	typedef UINT16 Index;
+	struct Vertex { float v1, v2, v3; };
+	ComPtr<ID3D12Resource> m_indexBuffer;
+	ComPtr<ID3D12Resource> m_vertexBuffer;
+
+	// Acceleration structure
+	ComPtr<ID3D12Resource> m_accelerationStructure;
+	ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
+	ComPtr<ID3D12Resource> m_topLevelAccelerationStructure;
+
+	// Shader table
+	static const wchar_t* c_hitGroupName;
+	static const wchar_t* c_raygenShaderName;
+	static const wchar_t* c_closestHitShaderName;
+	static const wchar_t* c_missShaderName;
+	ComPtr<ID3D12Resource> m_missShaderTable;
+	ComPtr<ID3D12Resource> m_hitGroupShaderTable;
+	ComPtr<ID3D12Resource> m_rayGenShaderTable;
+
 	// others
 	ComPtr<ID3D12Device> m_device;
 	ComPtr<IDXGIAdapter4> m_adapter;
@@ -80,7 +94,7 @@ private:
 	ComPtr<ID3D12CommandAllocator> m_commandAllocators[RendererPrivate::MAX_FRAMES];
 	ComPtr<ID3D12GraphicsCommandList> m_commandList;
 	ComPtr<ID3D12Fence> m_fence;
-	ComPtr<ID3D12Resource> m_vertexBuffer;
+	//ComPtr<ID3D12Resource> m_vertexBuffer;
 	
 
 	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
