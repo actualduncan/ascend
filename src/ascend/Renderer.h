@@ -16,7 +16,20 @@ namespace RendererPrivate
 	constexpr uint8_t MAX_FRAMES = 3;
 
 }
+namespace GlobalRootSignatureParams {
+	enum Value {
+		OutputViewSlot = 0,
+		AccelerationStructureSlot,
+		Count
+	};
+}
 
+namespace LocalRootSignatureParams {
+	enum Value {
+		ViewportConstantSlot = 0,
+		Count
+	};
+}
 struct FrameContext
 {
 	ComPtr<ID3D12CommandAllocator> CommandAllocator;
@@ -55,6 +68,8 @@ private:
 	void CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC* raytracingPipeline);
 	void CreateDeviceDependentResources();
 	void CreateWindowSizeDependentResources();
+	void DoRaytracing();
+	void CopyRaytracingOutputToBackbuffer();
 	UINT AllocateDescriptor(D3D12_CPU_DESCRIPTOR_HANDLE* cpuDescriptor, UINT descriptorIndexToUse);
 	ComPtr<ID3D12Device5> m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
@@ -118,7 +133,7 @@ private:
 	CD3DX12_VIEWPORT m_viewport;
 	CD3DX12_RECT m_scissorRect;
 	HANDLE m_SwapChainWaitableObject;
-	UINT m_frameIndex;
+	UINT m_frameIndex = 0;
 	UINT64 m_fenceValues[RendererPrivate::MAX_FRAMES];
 	HANDLE m_fenceEvent;
 };
