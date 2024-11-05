@@ -620,20 +620,22 @@ void RenderDevice::OnRender()
 	ImGui::NewFrame();
 	ImGui::ShowDemoWindow();
 
-	ImGui::Render();
 
 
-	//PopulateCommandLists();
 	m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
 	{
 		D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		m_commandList->ResourceBarrier(1, &barrier);
 	}
 
-	ImGui::UpdatePlatformWindows();
-    ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
 	DoRaytracing();
 	CopyRaytracingOutputToBackbuffer();
+
+	ImGui::Render();
+	PopulateCommandLists();
+
+	ImGui::UpdatePlatformWindows();
+	ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
 
 	m_commandList->Close();
 	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
@@ -646,10 +648,6 @@ void RenderDevice::OnRender()
 }
 void RenderDevice::PopulateCommandLists()
 {
-
-	VERIFYD3D12RESULT(m_commandAllocators[m_frameIndex]->Reset());
-
-
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -658,16 +656,12 @@ void RenderDevice::PopulateCommandLists()
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
 
-	VERIFYD3D12RESULT(m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr));
 	m_commandList->ResourceBarrier(1, &barrier);
 
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
 	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
 
-	// Record commands.
-	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
 	m_commandList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
 
 	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
@@ -676,8 +670,6 @@ void RenderDevice::PopulateCommandLists()
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
 
 	m_commandList->ResourceBarrier(1, &barrier);
-
-	m_commandList->Close();
 
 }
 void RenderDevice::WaitForGPU()
