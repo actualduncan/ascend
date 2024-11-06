@@ -591,6 +591,7 @@ void RenderDevice::DoRaytracing()
 
 	m_commandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
 
+	
 	// Bind the heaps, acceleration structure and dispatch rays.    
 	D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
 	m_commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
@@ -621,13 +622,14 @@ void RenderDevice::OnRender()
 	ImGui::ShowDemoWindow();
 
 
-
+	m_commandAllocators[m_frameIndex]->Reset();
 	m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
+
 	{
 		D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		m_commandList->ResourceBarrier(1, &barrier);
 	}
-
+	
 	DoRaytracing();
 	CopyRaytracingOutputToBackbuffer();
 
@@ -640,10 +642,10 @@ void RenderDevice::OnRender()
 	m_commandList->Close();
 	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
 	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
-
-
+	
+	
 	VERIFYD3D12RESULT(m_swapChain->Present(1, 0));
-
+	
 	MoveToNextFrame();
 }
 void RenderDevice::PopulateCommandLists()
