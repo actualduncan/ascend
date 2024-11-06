@@ -9,23 +9,13 @@
 //
 //*********************************************************
 
-struct PSInput
-{
-    float4 position : SV_POSITION;
-    float4 color : COLOR;
-};
+#ifndef HLSLCOMPAT_H
+#define HLSLCOMPAT_H
 
-PSInput VSMain(float4 position : POSITION, float4 color : COLOR)
-{
-    PSInput result;
+typedef float3 XMFLOAT3;
+typedef float4 XMFLOAT4;
+typedef float4 XMVECTOR;
+typedef float4x4 XMMATRIX;
+typedef uint UINT;
 
-    result.position = position;
-    result.color = color;
-
-    return result;
-}
-
-float4 PSMain(PSInput input) : SV_TARGET
-{
-    return input.color;
-}
+#endif // HLSLCOMPAT_H
