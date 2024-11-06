@@ -634,6 +634,7 @@ void RenderDevice::OnRender()
 	CopyRaytracingOutputToBackbuffer();
 
 	ImGui::Render();
+
 	PopulateCommandLists();
 
 	ImGui::UpdatePlatformWindows();

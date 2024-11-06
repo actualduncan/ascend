@@ -22,6 +22,8 @@ set(SOURCES ascend/main.cpp
 			ascend/ascendHelpers.h
 			ascend/Renderer.cpp 
 			ascend/Renderer.h 
+			ascend/RayTracingRHI.cpp
+			ascend/RayTracingRHI.h 
 			ascend/WindowsApplication.cpp 
 			ascend/WindowsApplication.h
 			ascend/imgui/imconfig.h
