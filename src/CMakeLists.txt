@@ -24,6 +24,7 @@ set(SOURCES ascend/main.cpp
 			ascend/Renderer.h 
 			ascend/WindowsApplication.cpp 
 			ascend/WindowsApplication.h
+			ascend/D3D12HelloWorkGraphs.cpp
 			ascend/imgui/imconfig.h
 			ascend/imgui/imgui.cpp
 			ascend/imgui/imgui.h
@@ -46,7 +47,8 @@ set(SOURCES ascend/main.cpp
 set(HLSL_SHADER_FILES ascend/Shader/Raytracing.hlsl)
 set(SHADER_FILES ${HLSL_SHADER_FILES} 					  
 				 ascend/Shader/HlslCompat.h
-				 ascend/Shader/RaytracingHlslCompat.h)  
+				 ascend/Shader/RaytracingHlslCompat.h
+				 ascend/Shader/D3D12HelloWorkGraphs.hlsl)  
 set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ascend/Shader)
 set_source_files_properties(${HLSL_SHADER_FILES} PROPERTIES VS_SHADER_TYPE lib)
 set_source_files_properties(${HLSL_SHADER_FILES} PROPERTIES VS_SHADER_MODEL 6_3)

@@ -82,6 +82,7 @@ bool RenderDevice::Initialize(HWND hwnd)
 	}
 
 #if DEBUG
+	
 	ComPtr<ID3D12InfoQueue1> infoQueue;
 	if (SUCCEEDED(m_device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
 	{
@@ -93,6 +94,7 @@ bool RenderDevice::Initialize(HWND hwnd)
 		pInfoQueue->Release();
 		m_debugController->Release();
 	}
+	
 #endif //DEBUG
 
 	{
