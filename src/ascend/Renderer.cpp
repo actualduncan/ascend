@@ -20,6 +20,8 @@ const wchar_t* RenderDevice::c_missShaderName = L"MyMissShader";
 
 RenderDevice::RenderDevice()
 {
+
+#pragma region RAY_TRACING
 	m_rayGenCB.viewport = { -1.0f, -1.0f, 1.0f, 1.0f };
 	float border = 0.1f;
 	if (m_width <= m_height)
@@ -39,19 +41,40 @@ RenderDevice::RenderDevice()
 		};
 
 	}
+#pragma endregion
+
 }
 
 RenderDevice::~RenderDevice()
 {	
-	
 	//Shutdown();
 }
 
 bool RenderDevice::Initialize(HWND hwnd)
 {
-
+	m_hwnd = hwnd;
 	bool hasInitialized = true;
 
+	InitializeDebugDevice();
+
+	CreateCommandQueues();
+
+	CreateDescriptorHeaps();
+
+	CreateFrameResources();
+
+	WaitForGPU();
+
+#pragma region RAY_TRACING
+	CreateDeviceDependentResources();
+	CreateWindowSizeDependentResources();
+#pragma endregion
+
+	return true;
+}
+
+void RenderDevice::InitializeDebugDevice()
+{
 	DWORD dxgiFactoryFlags = 0;
 
 #if DEBUG
@@ -64,8 +87,6 @@ bool RenderDevice::Initialize(HWND hwnd)
 	}
 #endif //DEBUG
 
-
-	ComPtr<IDXGIFactory7> m_factory;
 	VERIFYD3D12RESULT(CreateDXGIFactory2(dxgiFactoryFlags, IID_PPV_ARGS(&m_factory)));
 
 	for (uint32_t id = 0; DXGI_ERROR_NOT_FOUND != m_factory->EnumAdapterByGpuPreference(id, DXGI_GPU_PREFERENCE_UNSPECIFIED, IID_PPV_ARGS(&m_adapter)); ++id)
@@ -95,14 +116,18 @@ bool RenderDevice::Initialize(HWND hwnd)
 	}
 #endif //DEBUG
 
-	{
-		D3D12_COMMAND_QUEUE_DESC desc = {};
-		desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-		desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-		VERIFYD3D12RESULT(m_device->CreateCommandQueue(&desc, IID_PPV_ARGS(&m_commandQueue)));
-	}
+}
 
+void RenderDevice::CreateCommandQueues()
+{
+	D3D12_COMMAND_QUEUE_DESC desc = {};
+	desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+	VERIFYD3D12RESULT(m_device->CreateCommandQueue(&desc, IID_PPV_ARGS(&m_commandQueue)));
+}
 
+void RenderDevice::CreateDescriptorHeaps()
+{
 	{
 		// Describe and create a render target view (RTV) descriptor heap.
 		D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc = {};
@@ -114,15 +139,19 @@ bool RenderDevice::Initialize(HWND hwnd)
 		m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
-	// Create frame resources.
+	// Describe and Create SRV/UAV descriptor heap
 	{
 
+	}
+}
 
+void RenderDevice::CreateFrameResources()
+{
+	{
 		// Create a RTV and a command allocator for each frame.
 		for (UINT n = 0; n < RendererPrivate::MAX_FRAMES; n++)
 		{
 			VERIFYD3D12RESULT(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
-
 		}
 	}
 
@@ -134,28 +163,6 @@ bool RenderDevice::Initialize(HWND hwnd)
 		VERIFYD3D12RESULT(m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_srvHeap)));
 	}
 
-	ImGui_ImplDX12_Init(m_device.Get(), RendererPrivate::MAX_FRAMES, DXGI_FORMAT_R8G8B8A8_UNORM,
-		m_srvHeap.Get(),
-		m_srvHeap->GetCPUDescriptorHandleForHeapStart(),
-		m_srvHeap->GetGPUDescriptorHandleForHeapStart());
-
-	VERIFYD3D12RESULT(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[0].Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
-	m_commandList->Close();
-	// syncro objects (fences)
-
-	VERIFYD3D12RESULT(m_device->CreateFence(m_fenceValues[m_frameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
-	++m_fenceValues[m_frameIndex];
-
-	m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-	if (m_fenceEvent == nullptr)
-	{
-		VERIFYD3D12RESULT(HRESULT_FROM_WIN32(GetLastError()));
-	}
-
-
-
-
-	WaitForGPU();
 	// Release resources that are tied to the swap chain and update fence values.
 	for (UINT n = 0; n < RendererPrivate::MAX_FRAMES; n++)
 	{
@@ -183,14 +190,8 @@ bool RenderDevice::Initialize(HWND hwnd)
 	{
 		ComPtr<IDXGISwapChain1> swapChain1;
 
-		// TODO: Add fullscreen support
-		VERIFYD3D12RESULT(m_factory->CreateSwapChainForHwnd(m_commandQueue.Get(), hwnd, &swapChainDesc, nullptr, nullptr, &swapChain1));	// use CreateSwapChainForCoreWindow for Windows Store apps
-		//VERIFYD3D12RESULT(m_factory->MakeWindowAssociation(hwnd, DXGI_MWA_NO_ALT_ENTER));
-		VERIFYD3D12RESULT(swapChain1.As(&m_swapChain)); // seems like you can only create a swapchain1. Therefore to get currentBackbuffer
-
-		//VERIFYD3D12RESULT(swapChain1->QueryInterface(IID_PPV_ARGS(&m_swapChain)));
-
-		
+		VERIFYD3D12RESULT(m_factory->CreateSwapChainForHwnd(m_commandQueue.Get(), m_hwnd, &swapChainDesc, nullptr, nullptr, &swapChain1));	// use CreateSwapChainForCoreWindow for Windows Store apps
+		VERIFYD3D12RESULT(swapChain1.As(&m_swapChain)); 
 	}
 
 	for (UINT n = 0; n < RendererPrivate::MAX_FRAMES; ++n)
@@ -210,10 +211,28 @@ bool RenderDevice::Initialize(HWND hwnd)
 	}
 
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
-	CreateDeviceDependentResources();
-	CreateWindowSizeDependentResources();
-	return true;
+
+
+	ImGui_ImplDX12_Init(m_device.Get(), RendererPrivate::MAX_FRAMES, DXGI_FORMAT_R8G8B8A8_UNORM,
+		m_srvHeap.Get(),
+		m_srvHeap->GetCPUDescriptorHandleForHeapStart(),
+		m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+
+	VERIFYD3D12RESULT(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[0].Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
+	m_commandList->Close();
+	// syncro objects (fences)
+
+	VERIFYD3D12RESULT(m_device->CreateFence(m_fenceValues[m_frameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+	++m_fenceValues[m_frameIndex];
+
+	m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
+	if (m_fenceEvent == nullptr)
+	{
+		VERIFYD3D12RESULT(HRESULT_FROM_WIN32(GetLastError()));
+	}
 }
+
+#pragma region RAY_TRACING
 void RenderDevice::CreateDeviceDependentResources()
 {
 	// Initialize raytracing pipeline.
@@ -222,13 +241,13 @@ void RenderDevice::CreateDeviceDependentResources()
 	CreateRaytracingInterfaces();
 
 	// Create root signatures for the shaders.
-	CreateRootSignatures();
+	CreateRaytracingRootSignatures();
 
 	// Create a raytracing pipeline state object which defines the binding of shaders, state and resources to be used during raytracing.
 	CreateRaytracingPSO();
 
 	// Create a heap for descriptors.
-	CreateDescriptorHeap();
+	CreateRaytracingDescriptorHeap();
 
 	// Build geometry to be used in the sample.
 	BuildGeometry();
@@ -257,7 +276,7 @@ void RenderDevice::CreateRaytracingInterfaces()
 	VERIFYD3D12RESULT(m_commandList->QueryInterface(IID_PPV_ARGS(&m_dxrCommandList)));
 }
 
-void RenderDevice::CreateRootSignatures()
+void RenderDevice::CreateRaytracingRootSignatures()
 {
 	{
 		CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
@@ -266,7 +285,7 @@ void RenderDevice::CreateRootSignatures()
 		rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
 		rootParameters[1].InitAsShaderResourceView(0);
 		CD3DX12_ROOT_SIGNATURE_DESC globalRootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters);
-		
+
 		ComPtr<ID3DBlob> blob;
 		ComPtr<ID3DBlob> error;
 		VERIFYD3D12RESULT(D3D12SerializeRootSignature(&globalRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error));
@@ -283,7 +302,7 @@ void RenderDevice::CreateRootSignatures()
 		VERIFYD3D12RESULT(D3D12SerializeRootSignature(&localRootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &blob, &error));
 		VERIFYD3D12RESULT(m_device->CreateRootSignature(1, blob->GetBufferPointer(), blob->GetBufferSize(), IID_PPV_ARGS(&m_raytracingLocalRootSignature)));
 	}
-	
+
 }
 
 void RenderDevice::CreateRaytracingPSO()
@@ -355,7 +374,8 @@ void RenderDevice::CreateLocalRootSignatureSubobjects(CD3DX12_STATE_OBJECT_DESC*
 		rootSignatureAssociation->AddExport(c_raygenShaderName);
 	}
 }
-void RenderDevice::CreateDescriptorHeap()
+
+void RenderDevice::CreateRaytracingDescriptorHeap()
 {
 
 	D3D12_DESCRIPTOR_HEAP_DESC descriptorHeapDesc = {};
@@ -369,29 +389,6 @@ void RenderDevice::CreateDescriptorHeap()
 	NAME_D3D12_OBJECT(m_descriptorHeap);
 
 	m_descriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
-}
-
-void RenderDevice::BuildGeometry()
-{
-	Index indices[] =
-	{
-		0, 1, 2
-	};
-
-	float depthValue = 1.0;
-	float offset = 0.7f;
-	Vertex vertices[] =
-	{
-		// The sample raytraces in screen space coordinates.
-		// Since DirectX screen space coordinates are right handed (i.e. Y axis points down).
-		// Define the vertices in counter clockwise order ~ clockwise in left handed.
-		{ 0, -offset, depthValue },
-		{ -offset, offset, depthValue },
-		{ offset, offset, depthValue }
-	};
-
-	AllocateUploadBuffer(m_device.Get(), vertices, sizeof(vertices), &m_vertexBuffer);
-	AllocateUploadBuffer(m_device.Get(), indices, sizeof(indices), &m_indexBuffer);
 }
 
 void RenderDevice::BuildAccelerationStructures()
@@ -569,6 +566,7 @@ void RenderDevice::CreateRaytracingOutputResource()
 	m_device->CreateUnorderedAccessView(m_raytracingOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
 	m_raytracingOutputResourceUAVGpuDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_descriptorHeap->GetGPUDescriptorHandleForHeapStart(), m_raytracingOutputResourceUAVDescriptorHeapIndex, m_descriptorSize);
 }
+
 void RenderDevice::DoRaytracing()
 {
 	auto DispatchRays = [&](auto* commandList, auto* stateObject, auto* dispatchDesc)
@@ -591,7 +589,7 @@ void RenderDevice::DoRaytracing()
 
 	m_commandList->SetComputeRootSignature(m_raytracingGlobalRootSignature.Get());
 
-	
+
 	// Bind the heaps, acceleration structure and dispatch rays.    
 	D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
 	m_commandList->SetDescriptorHeaps(1, m_descriptorHeap.GetAddressOf());
@@ -599,6 +597,7 @@ void RenderDevice::DoRaytracing()
 	m_commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
 	DispatchRays(m_dxrCommandList.Get(), m_dxrStateObject.Get(), &dispatchDesc);
 }
+
 void RenderDevice::CopyRaytracingOutputToBackbuffer()
 {
 	D3D12_RESOURCE_BARRIER preCopyBarriers[2];
@@ -614,13 +613,37 @@ void RenderDevice::CopyRaytracingOutputToBackbuffer()
 
 	m_commandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
 }
+#pragma endregion
+
+void RenderDevice::BuildGeometry()
+{
+	Index indices[] =
+	{
+		0, 1, 2
+	};
+
+	float depthValue = 1.0;
+	float offset = 0.7f;
+	Vertex vertices[] =
+	{
+		// The sample raytraces in screen space coordinates.
+		// Since DirectX screen space coordinates are right handed (i.e. Y axis points down).
+		// Define the vertices in counter clockwise order ~ clockwise in left handed.
+		{ 0, -offset, depthValue },
+		{ -offset, offset, depthValue },
+		{ offset, offset, depthValue }
+	};
+
+	AllocateUploadBuffer(m_device.Get(), vertices, sizeof(vertices), &m_vertexBuffer);
+	AllocateUploadBuffer(m_device.Get(), indices, sizeof(indices), &m_indexBuffer);
+}
+
 void RenderDevice::OnRender()
 {
 	ImGui_ImplDX12_NewFrame();
 	ImGui_ImplWin32_NewFrame();
 	ImGui::NewFrame();
 	ImGui::ShowDemoWindow();
-
 
 	m_commandAllocators[m_frameIndex]->Reset();
 	m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
@@ -630,8 +653,10 @@ void RenderDevice::OnRender()
 		m_commandList->ResourceBarrier(1, &barrier);
 	}
 	
+#pragma region RAY_TRACING
 	DoRaytracing();
 	CopyRaytracingOutputToBackbuffer();
+#pragma endregion
 
 	ImGui::Render();
 
@@ -649,6 +674,7 @@ void RenderDevice::OnRender()
 	
 	MoveToNextFrame();
 }
+
 void RenderDevice::PopulateCommandLists()
 {
 	D3D12_RESOURCE_BARRIER barrier = {};
@@ -675,6 +701,7 @@ void RenderDevice::PopulateCommandLists()
 	m_commandList->ResourceBarrier(1, &barrier);
 
 }
+
 void RenderDevice::WaitForGPU()
 {
 	// Schedule Signal command

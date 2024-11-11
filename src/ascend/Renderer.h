@@ -6,7 +6,6 @@
 #include <wrl.h>
 #include <DirectXMath.h>
 #include "Shader/RaytracingHlslCompat.h"
-//#include "WindowsApplication.h"
 
 using namespace Microsoft::WRL;
 using namespace DirectX;
@@ -14,8 +13,10 @@ using namespace DirectX;
 namespace RendererPrivate
 {
 	constexpr uint8_t MAX_FRAMES = 3;
-
 }
+
+#pragma region RAY_TRACING
+
 namespace GlobalRootSignatureParams {
 	enum Value {
 		OutputViewSlot = 0,
@@ -30,38 +31,39 @@ namespace LocalRootSignatureParams {
 		Count
 	};
 }
-struct FrameContext
-{
-	ComPtr<ID3D12CommandAllocator> CommandAllocator;
-	UINT64                         FenceValue;
-};
+
+#pragma endregion
 
 class RenderDevice
 {
 public:
 	RenderDevice();
 	~RenderDevice();
+
 	bool Initialize(HWND hwnd);
+	void InitializeDebugDevice();
+	void CreateCommandQueues();
+	void CreateDescriptorHeaps();
+	void CreateFrameResources();
 	void WaitForGPU();
 	void MoveToNextFrame();
 	void PopulateCommandLists();
 	void OnRender();
 	void BuildGeometry();
-private:
 
-	
-	FrameContext m_frameContext[RendererPrivate::MAX_FRAMES];
+private:
 
 	// Viewport dimensions.
 	UINT m_width = 1280;
 	UINT m_height = 800;
 	float m_aspectRatio;
 
+#pragma region RAY_TRACING
 	// Raytracing
 	void CreateRaytracingInterfaces();
-	void CreateRootSignatures();
+	void CreateRaytracingRootSignatures();
 	void CreateRaytracingPSO();
-	void CreateDescriptorHeap();
+	void CreateRaytracingDescriptorHeap();
 	void BuildAccelerationStructures();
 	void BuildShaderTables();
 	void CreateRaytracingOutputResource();
@@ -85,11 +87,6 @@ private:
 	UINT m_descriptorsAllocated = 0;
 	UINT m_descriptorSize;
 
-	typedef UINT16 Index;
-	struct Vertex { float v1, v2, v3; };
-	ComPtr<ID3D12Resource> m_indexBuffer;
-	ComPtr<ID3D12Resource> m_vertexBuffer;
-
 	// Acceleration structure
 	ComPtr<ID3D12Resource> m_accelerationStructure;
 	ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
@@ -109,10 +106,13 @@ private:
 	D3D12_GPU_DESCRIPTOR_HANDLE m_raytracingOutputResourceUAVGpuDescriptor;
 	UINT m_raytracingOutputResourceUAVDescriptorHeapIndex = UINT_MAX;
 
+
+#pragma endregion
+
 	// others
 	ComPtr<ID3D12Device> m_device;
 	ComPtr<IDXGIAdapter4> m_adapter;
-
+	ComPtr<IDXGIFactory7> m_factory;
 	ComPtr<IDXGISwapChain4> m_swapChain;
 	ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
 	ComPtr<ID3D12DescriptorHeap> m_srvHeap;
@@ -124,8 +124,12 @@ private:
 	ComPtr<ID3D12CommandAllocator> m_commandAllocators[RendererPrivate::MAX_FRAMES];
 	ComPtr<ID3D12GraphicsCommandList> m_commandList;
 	ComPtr<ID3D12Fence> m_fence;
-	//ComPtr<ID3D12Resource> m_vertexBuffer;
-	
+
+	// Primitives
+	typedef UINT16 Index;
+	struct Vertex { float v1, v2, v3; };
+	ComPtr<ID3D12Resource> m_indexBuffer;
+	ComPtr<ID3D12Resource> m_vertexBuffer;
 
 	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
 	UINT m_rtvDescriptorSize;
@@ -136,5 +140,6 @@ private:
 	UINT m_frameIndex = 0;
 	UINT64 m_fenceValues[RendererPrivate::MAX_FRAMES];
 	HANDLE m_fenceEvent;
+	HWND m_hwnd;
 };
 
