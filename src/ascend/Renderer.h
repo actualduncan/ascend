@@ -109,6 +109,24 @@ private:
 
 #pragma endregion
 
+#pragma region COMPUTE_PIPELINE
+	ComPtr<ID3D12CommandQueue> m_computeCommandQueue;
+	ComPtr<ID3D12GraphicsCommandList> m_computeCommandList;
+	ComPtr<ID3D12CommandAllocator> m_computeCommandAllocators[RendererPrivate::MAX_FRAMES];
+	ComPtr<ID3D12RootSignature> m_computeRootSignature;
+	ComPtr<ID3D12PipelineState> m_computePipelineState;
+	ComPtr<ID3D12Resource> m_computeOutput;
+	ComPtr<ID3D12Fence> m_computeFence;
+	D3D12_GPU_DESCRIPTOR_HANDLE m_computeOutputUavDescriptorHandle;
+	UINT m_computeOutputUavDescriptorIndex;
+	UINT m_compute;
+	UINT m_computeDescriptorSize;
+
+	void LoadComputeAssets();
+	void DoCompute();
+	void CopyComputeOutputToBackBuffer();
+#pragma endregion
+
 	// others
 	ComPtr<ID3D12Device> m_device;
 	ComPtr<IDXGIAdapter4> m_adapter;

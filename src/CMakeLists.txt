@@ -71,18 +71,6 @@ foreach(FILE ${HLSL_SHADER_FILES})
                      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                      VERBATIM)		
 endforeach(FILE)
-set_source_files_properties(ascend/Shader/ComputeRaytracing.hlsl PROPERTIES VS_SHADER_TYPE cs)
-set_source_files_properties(ascend/Shader/ComputeRaytracing.hlsl PROPERTIES VS_SHADER_MODEL 6_6)
-set_source_files_properties(ascend/Shader/ComputeRaytracing.hlsl PROPERTIES VS_ENTRY_POINT CSMain)
-  get_filename_component(FILE_WE ascend/Shader/ComputeRaytracing.hlsl NAME_WE)
-  list(APPEND CSO_SHADER_FILES ${CMAKE_BINARY_DIR}/${FILE_WE}.cso)
-	add_custom_command(TARGET CompileShaders
-		COMMAND "dxc.exe" /E CSMain /Zi /Od /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T cs_6_6 /nologo ascend/Shader/ComputeRaytracing.hlsl
-		             MAIN_DEPENDENCY ascend/Shader/ComputeRaytracing.hlsl
-                     COMMENT "HLSL ascend/Shader/ComputeRaytracing.hlsl"
-                     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
-                     VERBATIM)	
-add_dependencies(ascend CompileShaders)
 
 file(GLOB_RECURSE AGILITY_HEADERS "${AGILITY_INCLUDE}/*.h*" )
 file(GLOB_RECURSE DXC_HEADERS "${DXC_INCLUDE}/*.h*" )

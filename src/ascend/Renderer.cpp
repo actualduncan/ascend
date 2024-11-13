@@ -63,11 +63,13 @@ bool RenderDevice::Initialize(HWND hwnd)
 
 	CreateFrameResources();
 
+	LoadComputeAssets();
+
 	WaitForGPU();
 
 #pragma region RAY_TRACING
-	CreateDeviceDependentResources();
-	CreateWindowSizeDependentResources();
+	//CreateDeviceDependentResources();
+	//CreateWindowSizeDependentResources();
 #pragma endregion
 
 	return true;
@@ -120,10 +122,20 @@ void RenderDevice::InitializeDebugDevice()
 
 void RenderDevice::CreateCommandQueues()
 {
-	D3D12_COMMAND_QUEUE_DESC desc = {};
-	desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-	desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-	VERIFYD3D12RESULT(m_device->CreateCommandQueue(&desc, IID_PPV_ARGS(&m_commandQueue)));
+	{
+		D3D12_COMMAND_QUEUE_DESC desc = {};
+		desc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+		desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		VERIFYD3D12RESULT(m_device->CreateCommandQueue(&desc, IID_PPV_ARGS(&m_commandQueue)));
+	}
+
+	// Compute
+	{
+		D3D12_COMMAND_QUEUE_DESC desc = {};
+		desc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
+		desc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		VERIFYD3D12RESULT(m_device->CreateCommandQueue(&desc, IID_PPV_ARGS(&m_computeCommandQueue)));
+	}
 }
 
 void RenderDevice::CreateDescriptorHeaps()
@@ -139,28 +151,25 @@ void RenderDevice::CreateDescriptorHeaps()
 		m_rtvDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	}
 
-	// Describe and Create SRV/UAV descriptor heap
-	{
-
-	}
-}
-
-void RenderDevice::CreateFrameResources()
-{
-	{
-		// Create a RTV and a command allocator for each frame.
-		for (UINT n = 0; n < RendererPrivate::MAX_FRAMES; n++)
-		{
-			VERIFYD3D12RESULT(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
-		}
-	}
-
+	// Describe and Create SRV/UAV descriptor heap (used for imgui, can disable to test for compute shader)
 	{
 		D3D12_DESCRIPTOR_HEAP_DESC desc = {};
 		desc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		desc.NumDescriptors = 1;
 		desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		VERIFYD3D12RESULT(m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_srvHeap)));
+	}
+}
+
+void RenderDevice::CreateFrameResources()
+{
+	{
+		// create a command allocator for each frame
+		for (UINT n = 0; n < RendererPrivate::MAX_FRAMES; n++)
+		{
+			VERIFYD3D12RESULT(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_commandAllocators[n])));
+			VERIFYD3D12RESULT(m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE, IID_PPV_ARGS(&m_computeCommandAllocators[n])));
+		}
 	}
 
 	// Release resources that are tied to the swap chain and update fence values.
@@ -219,10 +228,17 @@ void RenderDevice::CreateFrameResources()
 		m_srvHeap->GetGPUDescriptorHandleForHeapStart());
 
 	VERIFYD3D12RESULT(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[0].Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
+
+	// compute
+	VERIFYD3D12RESULT(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COMPUTE, m_computeCommandAllocators[0].Get(), nullptr, IID_PPV_ARGS(&m_computeCommandList)));
+
 	m_commandList->Close();
+	m_computeCommandList->Close();
+
 	// syncro objects (fences)
 
 	VERIFYD3D12RESULT(m_device->CreateFence(m_fenceValues[m_frameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence)));
+	VERIFYD3D12RESULT(m_device->CreateFence(m_fenceValues[m_frameIndex], D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_computeFence)));
 	++m_fenceValues[m_frameIndex];
 
 	m_fenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
@@ -231,7 +247,86 @@ void RenderDevice::CreateFrameResources()
 		VERIFYD3D12RESULT(HRESULT_FROM_WIN32(GetLastError()));
 	}
 }
+void RenderDevice::LoadComputeAssets()
+{
+	{
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
+		rootSignatureDesc.Init_1_1(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
+		VERIFYD3D12RESULT(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc;
+		desc.Init_1_1(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
+		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
+		VERIFYD3D12RESULT(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_computeRootSignature)))
+	}
+	// create pso
+	{
+		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+		ComPtr<ID3DBlob> computeShader;
+		ComPtr<ID3DBlob> error;
+		std::string shaderFilePath = "C:/Users/Duncan/Desktop/_dev/ascend/ascend/build/src/Debug/Shader/ComputeRaytracing.hlsl";
+		std::wstring computeFilePath(shaderFilePath.begin(), shaderFilePath.end());
+		VERIFYD3D12RESULT(D3DCompileFromFile(L"C:/Users/Duncan/Desktop/_dev/ascend/ascend/build/src/Debug/Shader/ComputeRaytracing.hlsl", nullptr, nullptr, "CSMain", "cs_5_1", compileFlags, 0, &computeShader, &error));
+		D3D12_COMPUTE_PIPELINE_STATE_DESC desc {};
+		desc.pRootSignature = m_computeRootSignature.Get();
+		desc.CS = CD3DX12_SHADER_BYTECODE(computeShader.Get());
+
+		VERIFYD3D12RESULT(m_device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_computePipelineState)));
+		NAME_D3D12_OBJECT(m_computePipelineState);
+	}
+
+
+
+	{
+		m_computeDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		VERIFYD3D12RESULT(m_device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_computeOutput)));
+	
+
+		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), 0, m_computeDescriptorSize);
+		//m_raytracingOutputResourceUAVDescriptorHeapIndex = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, descriptorIndexToUse, m_computeDescriptorSize);
+		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
+		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		m_device->CreateUnorderedAccessView(m_computeOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
+		m_computeOutputUavDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+
+	}
+}
+
+void RenderDevice::DoCompute()
+{
+	m_computeCommandList->SetPipelineState(m_computePipelineState.Get());
+	//D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
+	m_computeCommandList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
+	m_computeCommandList->SetComputeRootSignature(m_computeRootSignature.Get());
+	//m_computeCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_computeOutputUavDescriptorHandle);
+
+	m_computeCommandList->Dispatch(8, 1, 1);
+	//m_commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
+}
+
+void RenderDevice::CopyComputeOutputToBackBuffer()
+{
+	D3D12_RESOURCE_BARRIER preCopyBarriers[2];
+	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
+	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_computeOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	m_commandList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
+
+	m_commandList->CopyResource(m_renderTargets[m_frameIndex].Get(), m_computeOutput.Get());
+
+	D3D12_RESOURCE_BARRIER postCopyBarriers[2];
+	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_computeOutput.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+	m_commandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
+
+}
 #pragma region RAY_TRACING
 void RenderDevice::CreateDeviceDependentResources()
 {
@@ -646,18 +741,25 @@ void RenderDevice::OnRender()
 	ImGui::ShowDemoWindow();
 
 	m_commandAllocators[m_frameIndex]->Reset();
+	VERIFYD3D12RESULT(m_computeCommandAllocators[m_frameIndex]->Reset());
 	m_commandList->Reset(m_commandAllocators[m_frameIndex].Get(), nullptr);
+	VERIFYD3D12RESULT(m_computeCommandList->Reset(m_computeCommandAllocators[m_frameIndex].Get(), nullptr));
+
+	// However, when ExecuteCommandList() is called on a particular command 
+	// list, that command list can then be reset at any time and must be before 
+	// re-recording.
 
 	{
 		D3D12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_RENDER_TARGET);
 		m_commandList->ResourceBarrier(1, &barrier);
 	}
-	
-#pragma region RAY_TRACING
-	DoRaytracing();
-	CopyRaytracingOutputToBackbuffer();
-#pragma endregion
 
+#pragma region RAY_TRACING
+	//DoRaytracing();
+	//CopyRaytracingOutputToBackbuffer();
+#pragma endregion
+	DoCompute();
+	CopyComputeOutputToBackBuffer();
 	ImGui::Render();
 
 	PopulateCommandLists();
@@ -666,8 +768,20 @@ void RenderDevice::OnRender()
 	ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
 
 	m_commandList->Close();
+	m_computeCommandList->Close();
 	ID3D12CommandList* ppCommandLists[] = { m_commandList.Get() };
 	m_commandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+	{
+
+		ID3D12CommandList* ppCommandLists[] = { m_computeCommandList.Get() };
+		m_computeCommandQueue->ExecuteCommandLists(_countof(ppCommandLists), ppCommandLists);
+
+		m_computeCommandQueue->Signal(m_computeFence.Get(), m_fenceValues[m_frameIndex]);
+
+		// Execute the rendering work only when the compute work is complete.
+		m_commandQueue->Wait(m_computeFence.Get(), m_fenceValues[m_frameIndex]);
+	}
+
 	
 	
 	VERIFYD3D12RESULT(m_swapChain->Present(1, 0));
