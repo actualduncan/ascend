@@ -5,6 +5,7 @@
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_dx12.h"
 #include "Shader/CompiledShaders/Raytracing.hlsl.h"
+#include "Shader/CompiledShaders/ComputeRaytracing.hlsl.h"
 
 /*
 												WARNING
@@ -68,8 +69,8 @@ bool RenderDevice::Initialize(HWND hwnd)
 	WaitForGPU();
 
 #pragma region RAY_TRACING
-	//CreateDeviceDependentResources();
-	//CreateWindowSizeDependentResources();
+	CreateDeviceDependentResources();
+	CreateWindowSizeDependentResources();
 #pragma endregion
 
 	return true;
@@ -222,10 +223,10 @@ void RenderDevice::CreateFrameResources()
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
 
-	//ImGui_ImplDX12_Init(m_device.Get(), RendererPrivate::MAX_FRAMES, DXGI_FORMAT_R8G8B8A8_UNORM,
-		//m_srvHeap.Get(),
-		//m_srvHeap->GetCPUDescriptorHandleForHeapStart(),
-		//m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+	ImGui_ImplDX12_Init(m_device.Get(), RendererPrivate::MAX_FRAMES, DXGI_FORMAT_R8G8B8A8_UNORM,
+		m_srvHeap.Get(),
+		m_srvHeap->GetCPUDescriptorHandleForHeapStart(),
+		m_srvHeap->GetGPUDescriptorHandleForHeapStart());
 
 	VERIFYD3D12RESULT(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[0].Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
 
@@ -272,12 +273,10 @@ void RenderDevice::LoadComputeAssets()
 		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
 		ComPtr<ID3DBlob> computeShader;
 		ComPtr<ID3DBlob> error;
-		std::string shaderFilePath = "C:/Users/Duncan/Desktop/_dev/ascend/ascend/build/src/Debug/Shader/ComputeRaytracing.hlsl";
-		std::wstring computeFilePath(shaderFilePath.begin(), shaderFilePath.end());
-		VERIFYD3D12RESULT(D3DCompileFromFile(L"C:/Users/Duncan/Desktop/_dev/ascend/ascend/build/src/Debug/Shader/ComputeRaytracing.hlsl", nullptr, nullptr, "CSMain", "cs_5_1", compileFlags, 0, &computeShader, &error));
+		//VERIFYD3D12RESULT(D3DCompileFromFile(L"C:/Users/Duncan/Desktop/_dev/ascend/ascend/build/src/Debug/Shader/ComputeRaytracing.hlsl", nullptr, nullptr, "CSMain", "cs_5_1", compileFlags, 0, &computeShader, &error));
 		D3D12_COMPUTE_PIPELINE_STATE_DESC desc {};
 		desc.pRootSignature = m_computeRootSignature.Get();
-		desc.CS = CD3DX12_SHADER_BYTECODE(computeShader.Get());
+		desc.CS = CD3DX12_SHADER_BYTECODE(CD3DX12_SHADER_BYTECODE((void*)g_pComputeRaytracing, ARRAYSIZE(g_pComputeRaytracing)));
 
 		VERIFYD3D12RESULT(m_device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_computePipelineState)));
 		NAME_D3D12_OBJECT(m_computePipelineState);
@@ -326,7 +325,7 @@ void RenderDevice::CopyComputeOutputToBackBuffer()
 	m_commandList->CopyResource(m_renderTargets[m_frameIndex].Get(), m_computeOutput.Get());
 
 	D3D12_RESOURCE_BARRIER postCopyBarriers[2];
-	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PRESENT);
+	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET);
 	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_computeOutput.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
 
 	m_commandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
@@ -740,10 +739,10 @@ void RenderDevice::BuildGeometry()
 
 void RenderDevice::OnRender()
 {
-	//ImGui_ImplDX12_NewFrame();
-	//ImGui_ImplWin32_NewFrame();
-	//ImGui::NewFrame();
-	//ImGui::ShowDemoWindow();
+	ImGui_ImplDX12_NewFrame();
+	ImGui_ImplWin32_NewFrame();
+	ImGui::NewFrame();
+	ImGui::ShowDemoWindow();
 
 	m_commandAllocators[m_frameIndex]->Reset();
 	VERIFYD3D12RESULT(m_computeCommandAllocators[m_frameIndex]->Reset());
@@ -759,18 +758,20 @@ void RenderDevice::OnRender()
 		m_commandList->ResourceBarrier(1, &barrier);
 	}
 
+
+
 #pragma region RAY_TRACING
 	//DoRaytracing();
 	//CopyRaytracingOutputToBackbuffer();
 #pragma endregion
 	DoCompute();
 	CopyComputeOutputToBackBuffer();
-	//ImGui::Render();
-
+	ImGui::Render();
 	PopulateCommandLists();
 
-	//ImGui::UpdatePlatformWindows();
-	//ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
+
+	ImGui::UpdatePlatformWindows();
+	ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
 
 	m_commandList->Close();
 	m_computeCommandList->Close();
@@ -796,6 +797,16 @@ void RenderDevice::OnRender()
 
 void RenderDevice::PopulateCommandLists()
 {
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
+	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+	m_commandList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+
+	m_commandList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
+
+	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
 	D3D12_RESOURCE_BARRIER barrier = {};
 	barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
 	barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
@@ -803,16 +814,6 @@ void RenderDevice::PopulateCommandLists()
 	barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_PRESENT;
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_RENDER_TARGET;
-
-	m_commandList->ResourceBarrier(1, &barrier);
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(m_rtvHeap->GetCPUDescriptorHandleForHeapStart(), m_frameIndex, m_rtvDescriptorSize);
-	m_commandList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
-
-
-	m_commandList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
-
-	//ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
 
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
