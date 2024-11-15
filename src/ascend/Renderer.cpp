@@ -222,10 +222,10 @@ void RenderDevice::CreateFrameResources()
 	m_frameIndex = m_swapChain->GetCurrentBackBufferIndex();
 
 
-	ImGui_ImplDX12_Init(m_device.Get(), RendererPrivate::MAX_FRAMES, DXGI_FORMAT_R8G8B8A8_UNORM,
-		m_srvHeap.Get(),
-		m_srvHeap->GetCPUDescriptorHandleForHeapStart(),
-		m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+	//ImGui_ImplDX12_Init(m_device.Get(), RendererPrivate::MAX_FRAMES, DXGI_FORMAT_R8G8B8A8_UNORM,
+		//m_srvHeap.Get(),
+		//m_srvHeap->GetCPUDescriptorHandleForHeapStart(),
+		//m_srvHeap->GetGPUDescriptorHandleForHeapStart());
 
 	VERIFYD3D12RESULT(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[0].Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
 
@@ -250,14 +250,19 @@ void RenderDevice::CreateFrameResources()
 void RenderDevice::LoadComputeAssets()
 {
 	{
+		CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
+		UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+		CD3DX12_ROOT_PARAMETER rootParameters[1];
+		rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
+
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
 		rootSignatureDesc.Init_1_1(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
 		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
 		VERIFYD3D12RESULT(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc;
-		desc.Init_1_1(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc(ARRAYSIZE(rootParameters), rootParameters);
+		//desc.Init_1_1(0, rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
 		VERIFYD3D12RESULT(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_computeRootSignature)))
@@ -305,9 +310,9 @@ void RenderDevice::DoCompute()
 	//D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
 	m_computeCommandList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
 	m_computeCommandList->SetComputeRootSignature(m_computeRootSignature.Get());
-	//m_computeCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_computeOutputUavDescriptorHandle);
+	m_computeCommandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_computeOutputUavDescriptorHandle);
 
-	m_computeCommandList->Dispatch(8, 1, 1);
+	m_computeCommandList->Dispatch(ceil((float)m_width / 8), ceil((float)m_height / 8), 1);
 	//m_commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
 }
 
@@ -735,10 +740,10 @@ void RenderDevice::BuildGeometry()
 
 void RenderDevice::OnRender()
 {
-	ImGui_ImplDX12_NewFrame();
-	ImGui_ImplWin32_NewFrame();
-	ImGui::NewFrame();
-	ImGui::ShowDemoWindow();
+	//ImGui_ImplDX12_NewFrame();
+	//ImGui_ImplWin32_NewFrame();
+	//ImGui::NewFrame();
+	//ImGui::ShowDemoWindow();
 
 	m_commandAllocators[m_frameIndex]->Reset();
 	VERIFYD3D12RESULT(m_computeCommandAllocators[m_frameIndex]->Reset());
@@ -760,12 +765,12 @@ void RenderDevice::OnRender()
 #pragma endregion
 	DoCompute();
 	CopyComputeOutputToBackBuffer();
-	ImGui::Render();
+	//ImGui::Render();
 
 	PopulateCommandLists();
 
-	ImGui::UpdatePlatformWindows();
-	ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
+	//ImGui::UpdatePlatformWindows();
+	//ImGui::RenderPlatformWindowsDefault(nullptr, (void*)m_commandList.Get());
 
 	m_commandList->Close();
 	m_computeCommandList->Close();
@@ -807,7 +812,7 @@ void RenderDevice::PopulateCommandLists()
 
 	m_commandList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
 
-	ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
+	//ImGui_ImplDX12_RenderDrawData(ImGui::GetDrawData(), m_commandList.Get());
 
 	barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_RENDER_TARGET;
 	barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PRESENT;
