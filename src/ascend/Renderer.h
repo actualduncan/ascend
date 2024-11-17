@@ -125,6 +125,7 @@ private:
 	void LoadComputeAssets();
 	void DoCompute();
 	void CopyComputeOutputToBackBuffer();
+	void BuildAccelerationStructuresForCompute();
 #pragma endregion
 
 	// others
