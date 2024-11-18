@@ -7,7 +7,7 @@ asset_dependency_init(ascend)
 
 
 nuget_initialize(ascend)
-nuget_get_agility_sdk(ShaderTestFramework AGILITY_FOUND AGILITY_INCLUDE AGILITY_DLL SDK_VER)
+nuget_get_agility_sdk(ascend AGILITY_FOUND AGILITY_INCLUDE AGILITY_DLL SDK_VER)
 nuget_get_dxc(ascend DXC_FOUND DXC_INCLUDE DXC_DLL DXC_LIB)
 #nuget_get_warp(ShaderTestFramework WARP_FOUND WARP_DLL)
 #nuget_get_WinPixEventRuntime(ShaderTestFramework WINPIX_FOUND WINPIX_INCLUDE WINPIX_BIN)
@@ -26,7 +26,6 @@ set(SOURCES ascend/main.cpp
 			ascend/RayTracingRHI.h 
 			ascend/WindowsApplication.cpp 
 			ascend/WindowsApplication.h
-			ascend/D3D12HelloWorkGraphs.cpp
 			ascend/imgui/imconfig.h
 			ascend/imgui/imgui.cpp
 			ascend/imgui/imgui.h
@@ -46,17 +45,17 @@ set(SOURCES ascend/main.cpp
 )
 
 # TODO: Move to .cmake file for shader compiling - Reduce code duplication.
-set(HLSL_LIB_SHADER_FILES ascend/Shader/Raytracing.hlsl)
+set(HLSL_LIB_SHADER_FILES ascend/Shader/Raytracing.hlsl
+						  ascend/Shader/WorkGraphRaytracing.hlsl)
 set(HLSL_CS_SHADER_FILES  ascend/Shader/ComputeRaytracing.hlsl)
 set(SHADER_FILES ${HLSL_LIB_SHADER_FILES} 					  
 				 ${HLSL_CS_SHADER_FILES}
 				 ascend/Shader/HlslCompat.h
-				 ascend/Shader/RaytracingHlslCompat.h
-				 ascend/Shader/D3D12HelloWorkGraphs.hlsl)  
+				 ascend/Shader/RaytracingHlslCompat.h)  
 set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ascend/Shader)
 
 set_source_files_properties(${HLSL_LIB_SHADER_FILES} PROPERTIES VS_SHADER_TYPE lib)
-set_source_files_properties(${HLSL_LIB_SHADER_FILES} PROPERTIES VS_SHADER_MODEL 6_3)
+set_source_files_properties(${HLSL_LIB_SHADER_FILES} PROPERTIES VS_SHADER_MODEL 6_8)
 set_source_files_properties(${HLSL_LIB_SHADER_FILES} PROPERTIES VS_SHADER_ENTRY_POINT CSMain)
 set_source_files_properties(${HLSL_LIB_SHADER_FILES} PROPERTIES VS_SHADER_VARIABLE_NAME "g_p%(Filename)")
 set_source_files_properties(${HLSL_LIB_SHADER_FILES} PROPERTIES VS_SHADER_OUTPUT_HEADER_FILE "$(IntDir)CompiledShaders\%(Filename).hlsl.h")
@@ -77,7 +76,7 @@ foreach(FILE ${HLSL_LIB_SHADER_FILES})
   get_filename_component(FILE_WE ${FILE} NAME_WE)
   list(APPEND CSO_SHADER_FILES ${CMAKE_BINARY_DIR}/${FILE_WE}.cso)
 	add_custom_command(TARGET CompileShaders
-		COMMAND "dxc.exe" /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T lib_6_3 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
+		COMMAND "${DXC_DLL}/dxc.exe" /Vd /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T lib_6_8 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
 		             MAIN_DEPENDENCY ${FILE}
                      COMMENT "HLSL ${FILE}"
                      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -88,7 +87,7 @@ foreach(FILE ${HLSL_CS_SHADER_FILES})
   get_filename_component(FILE_WE ${FILE} NAME_WE)
   list(APPEND CSO_SHADER_FILES ${CMAKE_BINARY_DIR}/${FILE_WE}.cso)
 	add_custom_command(TARGET CompileShaders
-		COMMAND "dxc.exe" /E CSMain /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T cs_6_5 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
+		COMMAND "${DXC_DLL}/dxc.exe" /E CSMain /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T cs_6_5 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
 		             MAIN_DEPENDENCY ${FILE}
                      COMMENT "HLSL ${FILE}"
                      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -107,8 +106,6 @@ target_sources(ascend PRIVATE ${DXC_HEADERS})
 target_sources(ascend PRIVATE ${SHADER_FILES})
 
 set_source_files_properties(${SHADER_FILES}  PROPERTIES VS_SETTINGS "ExcludedFromBuild=true")
-
-
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX "Source" FILES ${SOURCES})
 source_group(TREE ${AGILITY_INCLUDE} PREFIX "ThirdParty/AgilitySDK" FILES ${AGILITY_HEADERS})
