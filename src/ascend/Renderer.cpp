@@ -13,6 +13,12 @@
 									The code is therefore very messy.
 		Most of this code is adapted from https://github.com/microsoft/DirectX-Graphics-Samples
  */
+extern "C" {
+	__declspec(dllexport) extern const unsigned int D3D12SDKVersion = 613;
+}
+extern "C" {
+	__declspec(dllexport) extern const char* D3D12SDKPath = ".\\";
+}
 
 const wchar_t* RenderDevice::c_hitGroupName = L"MyHitGroup";
 const wchar_t* RenderDevice::c_raygenShaderName = L"MyRaygenShader";
