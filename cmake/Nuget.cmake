@@ -21,32 +21,27 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-function(fetch_nuget_package)
-    set(options)
-    set(oneValueArgs PACKAGE VERSION)
-    set(multiValueArgs)
-	set(OUT_BINARY_PATH)
-    cmake_parse_arguments(FETCH_NUGET_PACKAGE  "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+function(fetch_nuget_package IN_PACKAGE IN_VERSION OUT_BINARY_PATH)
 
-    if (NOT DEFINED FETCH_NUGET_PACKAGE_PACKAGE)
+    if (NOT DEFINED IN_PACKAGE)
         message(FATAL_ERROR "Missing PACKAGE argument")
     endif()
-    if (NOT DEFINED FETCH_NUGET_PACKAGE_VERSION)
+    if (NOT DEFINED IN_VERSION)
         message(FATAL_ERROR "Missing VERSION argument")
     endif()
 
-    set(DOWNLOAD_URL "https://www.nuget.org/api/v2/package/${FETCH_NUGET_PACKAGE_PACKAGE}/${FETCH_NUGET_PACKAGE_VERSION}")
-    set(DOWNLOAD_FILE ${CMAKE_CURRENT_BINARY_DIR}/nuget/${FETCH_NUGET_PACKAGE_PACKAGE}.zip)
-    set(PACKAGE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/nuget/${FETCH_NUGET_PACKAGE_PACKAGE})
+    set(DOWNLOAD_URL "https://www.nuget.org/api/v2/package/${IN_PACKAGE}/${IN_VERSION}")
+    set(DOWNLOAD_FILE ${CMAKE_CURRENT_BINARY_DIR}/nuget/${IN_PACKAGE}.zip)
+    set(PACKAGE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/nuget/${IN_VERSION})
 
     if (NOT EXISTS ${DOWNLOAD_FILE})
-        message(STATUS "Downloading NuGet package \"${FETCH_NUGET_PACKAGE_PACKAGE}\" from \"${DOWNLOAD_URL}\".")
+        message(STATUS "Downloading NuGet package \"${IN_PACKAGE}\" from \"${DOWNLOAD_URL}\".")
 
         file(DOWNLOAD "${DOWNLOAD_URL}" ${DOWNLOAD_FILE} STATUS DOWNLOAD_RESULT)
 
         list(GET DOWNLOAD_RESULT 0 DOWNLOAD_RESULT_CODE)
         if(NOT DOWNLOAD_RESULT_CODE EQUAL 0)
-            message(FATAL_ERROR "Failed to download NuGet package \"${FETCH_NUGET_PACKAGE_PACKAGE}\" from \"${DOWNLOAD_URL}\". Error: ${DOWNLOAD_RESULT}.")
+            message(FATAL_ERROR "Failed to download NuGet package \"${IN_PACKAGE}\" from \"${DOWNLOAD_URL}\". Error: ${DOWNLOAD_RESULT}.")
         endif()
     endif()
 
@@ -54,13 +49,13 @@ function(fetch_nuget_package)
          INPUT ${DOWNLOAD_FILE}
          DESTINATION ${PACKAGE_DIRECTORY})
 
-    message(STATUS "Adding NuGet package \"${FETCH_NUGET_PACKAGE_PACKAGE}\".")
+    message(STATUS "Adding NuGet package \"${IN_PACKAGE}\".")
 
-    add_library(${FETCH_NUGET_PACKAGE_PACKAGE} INTERFACE)
-    target_include_directories(${FETCH_NUGET_PACKAGE_PACKAGE} INTERFACE ${PACKAGE_DIRECTORY}/build/native/include)
+    add_library(${IN_PACKAGE} INTERFACE)
+    target_include_directories(${IN_PACKAGE} INTERFACE ${PACKAGE_DIRECTORY}/build/native/include)
 
-    set(${OUT_BINARY_PATH} "${PACKAGE_DIRECTORY}/build/native/bin/x64")
-	
+    set(${OUT_BINARY_PATH} "${PACKAGE_DIRECTORY}/build/native/bin/x64" PARENT_SCOPE)
+
     file(GLOB PACKAGE_BIN_FILES 
         ${PACKAGE_DIRECTORY}/build/native/bin/x64/*.exe
         ${PACKAGE_DIRECTORY}/build/native/bin/x64/*.dll
@@ -80,9 +75,9 @@ function(fetch_nuget_package)
         list(APPEND COPY_FILES ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/$<CONFIG>/${PACKAGE_BIN_FILE_NAME})
     endforeach()
 
-    add_custom_target(${FETCH_NUGET_PACKAGE_PACKAGE}_copy DEPENDS "${COPY_FILES}")
-    set_target_properties(${FETCH_NUGET_PACKAGE_PACKAGE}_copy PROPERTIES FOLDER CopyTargets)
+    add_custom_target(${IN_PACKAGE}_copy DEPENDS "${COPY_FILES}")
+    set_target_properties(${IN_PACKAGE}_copy PROPERTIES FOLDER CopyTargets)
 
-    add_dependencies(${FETCH_NUGET_PACKAGE_PACKAGE} ${FETCH_NUGET_PACKAGE_PACKAGE}_copy)
+    add_dependencies(${IN_PACKAGE} ${IN_PACKAGE}_copy)
     
 endfunction(fetch_nuget_package)

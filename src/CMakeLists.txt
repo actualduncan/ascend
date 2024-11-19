@@ -1,33 +1,24 @@
 # includes from https://github.com/KStocky/ShaderTestFramework
 include(nuget)
 include(AssetDependencyManagement)
-
 add_executable(ascend WIN32)
 asset_dependency_init(ascend)
 
-
 fetch_nuget_package(
-    PACKAGE Microsoft.Direct3D.D3D12
-    VERSION 1.613.3
-	OUT_BINARY_PATH AGILITY_BINARY
+    Microsoft.Direct3D.D3D12
+    1.613.3
+	AGILITY_BINARY
 )
 fetch_nuget_package(
-    PACKAGE Microsoft.Direct3D.DXC
-    VERSION 1.8.2403.18
-	OUT_BINARY_PATH DXC_BINARY
+    Microsoft.Direct3D.DXC
+    1.8.2403.18
+	DXC_BINARY
 )
 fetch_nuget_package(
-    PACKAGE Microsoft.Direct3D.WARP
-    VERSION 1.0.13
-	OUT_BINARY_PATH WARP_BINARY
+    Microsoft.Direct3D.WARP
+    1.0.13
+	WARP_BINARY
 )
-
-#add_library(DXC SHARED IMPORTED)
-
-#set_target_properties(DXC PROPERTIES
-    #IMPORTED_IMPLIB "${DXC_LIB}/dxcompiler.lib"
-#)
-
 
 set(SOURCES ascend/main.cpp 
 			ascend/ascendHelpers.h
@@ -87,7 +78,7 @@ foreach(FILE ${HLSL_LIB_SHADER_FILES})
   get_filename_component(FILE_WE ${FILE} NAME_WE)
   list(APPEND CSO_SHADER_FILES ${CMAKE_BINARY_DIR}/${FILE_WE}.cso)
 	add_custom_command(TARGET CompileShaders
-		COMMAND "${DXC_BINARY}" /Vd /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T lib_6_8 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
+		COMMAND "${DXC_BINARY}/dxc.exe" /Vd /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T lib_6_8 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
 		             MAIN_DEPENDENCY ${FILE}
                      COMMENT "HLSL ${FILE}"
                      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -98,7 +89,7 @@ foreach(FILE ${HLSL_CS_SHADER_FILES})
   get_filename_component(FILE_WE ${FILE} NAME_WE)
   list(APPEND CSO_SHADER_FILES ${CMAKE_BINARY_DIR}/${FILE_WE}.cso)
 	add_custom_command(TARGET CompileShaders
-		COMMAND "${DXC_BINARY}" /E CSMain /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T cs_6_5 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
+		COMMAND "${DXC_BINARY}/dxc.exe" /E CSMain /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T cs_6_5 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
 		             MAIN_DEPENDENCY ${FILE}
                      COMMENT "HLSL ${FILE}"
                      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -107,13 +98,9 @@ endforeach(FILE)
 
 add_dependencies(ascend CompileShaders)
 
-#file(GLOB_RECURSE AGILITY_HEADERS "${AGILITY_INCLUDE}/*.h*" )
-#file(GLOB_RECURSE DXC_HEADERS "${DXC_INCLUDE}/*.h*" )
 file( COPY ${SHADER_SOURCE_DIR} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug )
 
 target_sources(ascend PRIVATE ${SOURCES})
-#target_sources(ascend PRIVATE ${AGILITY_HEADERS})
-#target_sources(ascend PRIVATE ${DXC_HEADERS})
 target_sources(ascend PRIVATE ${SHADER_FILES})
 
 set_source_files_properties(${SHADER_FILES}  PROPERTIES VS_SETTINGS "ExcludedFromBuild=true")
@@ -132,10 +119,6 @@ target_link_libraries(ascend PRIVATE
     dxcompiler
     dxgi
     dxguid)
-#target_link_libraries(ascend PRIVATE d3d12.lib dxgi.lib d3dcompiler.lib DXC dxguid.lib)
-
-#target_add_asset_directory(ascend ${AGILITY_DLL} "/D3D12")
-#target_add_asset_directory(ascend ${DXC_DLL} "/")
 
 add_definitions(-DUNICODE -D_UNICODE)
 add_compile_definitions(DEBUG)
