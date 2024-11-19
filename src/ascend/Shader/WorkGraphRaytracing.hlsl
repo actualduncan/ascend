@@ -23,6 +23,9 @@ EmptyNodeOutput nodeOutput)
 {
 
     RenderTarget[uint2(1,1)] = float4(1.0,0,0,1.0);
+    RenderTarget[uint2(2,2)] = float4(1.0,0,0,1.0);
+    RenderTarget[uint2(3,3)] = float4(1.0,0,0,1.0);
+    RenderTarget[uint2(4,4)] = float4(1.0,0,0,1.0);
 /*
     float3 dtfloat = float3(DTid.xyz);
     uint2 pixel = uint2(DTid.x, DTid.y);
