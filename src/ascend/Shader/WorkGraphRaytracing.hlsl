@@ -9,3 +9,59 @@
 //
 //*********************************************************
 
+RWTexture2D<float4> RenderTarget : register(u0);
+RaytracingAccelerationStructure Scene : register(t0, space0);
+
+[Shader("node")]
+[NodeIsProgramEntry]
+[NodeLaunch("thread")]
+[NodeId("Entry", 0)]
+void EntryFunction(
+[MaxRecords(1)]         
+[NodeId("Worker")]              
+EmptyNodeOutput nodeOutput)
+{
+
+    RenderTarget[uint2(1,1)] = float4(1.0,0,0,1.0);
+/*
+    float3 dtfloat = float3(DTid.xyz);
+    uint2 pixel = uint2(DTid.x, DTid.y);
+    RayDesc ray;
+
+    // need to replace with viewport and width in constant buffer
+    ray.Origin = float3(lerp(-1.0, 1.0, dtfloat.x / 1280.0), lerp(-1.0, 1.0, dtfloat.y / 800.0), 0.0);
+    ray.Direction = float3(0, 0, 1);
+    ray.TMin = 0.01;
+    ray.TMax = 100000;
+    
+    RayQuery < RAY_FLAG_CULL_NON_OPAQUE |
+             RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
+             RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH > rayQuery;
+    rayQuery.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
+    rayQuery.Proceed();
+   
+    if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+    {
+        
+        RenderTarget[pixel] = float4(1.0, 0, 0, 1.0);
+    }
+    else
+    {
+        RenderTarget[pixel] = float4(0, 0, 0, 1.0);
+
+    }
+
+    GroupMemoryBarrierWithGroupSync();
+*/
+}
+
+[Shader("node")]
+[NodeId("Worker", 0)]
+[NodeLaunch("thread")]
+void WorkerFunction()
+{
+    // Position cursor in center of screen.
+    
+    // Congratulations, you've successfully completed tutorial-0!
+    // To move on to the next tutorial, open the "Tutorials" menu on the top-left of the playground application and select "Tutorial 1: Records".
+}
