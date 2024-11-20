@@ -13,20 +13,12 @@ RWTexture2D<float4> RenderTarget : register(u0);
 RaytracingAccelerationStructure Scene : register(t0, space0);
 
 [Shader("node")]
+[NodeLaunch("broadcasting")]
 [NodeIsProgramEntry]
-[NodeLaunch("thread")]
-[NodeId("Entry", 0)]
-void EntryFunction(
-[MaxRecords(1)]         
-[NodeId("Worker")]              
-EmptyNodeOutput nodeOutput)
+[NodeDispatchGrid(1, 1, 1)] // This will be overridden during pipeline creation
+[numthreads(1, 1, 1)]
+void EntryFunction(uint3 DTid : SV_DispatchThreadID)
 {
-
-    RenderTarget[uint2(1,1)] = float4(1.0,0,0,1.0);
-    RenderTarget[uint2(2,2)] = float4(1.0,0,0,1.0);
-    RenderTarget[uint2(3,3)] = float4(1.0,0,0,1.0);
-    RenderTarget[uint2(4,4)] = float4(1.0,0,0,1.0);
-/*
     float3 dtfloat = float3(DTid.xyz);
     uint2 pixel = uint2(DTid.x, DTid.y);
     RayDesc ray;
@@ -55,9 +47,10 @@ EmptyNodeOutput nodeOutput)
     }
 
     GroupMemoryBarrierWithGroupSync();
-*/
+
 }
 
+/*
 [Shader("node")]
 [NodeId("Worker", 0)]
 [NodeLaunch("thread")]
@@ -68,3 +61,4 @@ void WorkerFunction()
     // Congratulations, you've successfully completed tutorial-0!
     // To move on to the next tutorial, open the "Tutorials" menu on the top-left of the playground application and select "Tutorial 1: Records".
 }
+*/

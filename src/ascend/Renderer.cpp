@@ -286,6 +286,9 @@ void RenderDevice::CreateWorkGraph()
 	workGraphSubobject->IncludeAllAvailableNodes();
 	workGraphSubobject->SetProgramName(WorkGraphProgramName);
 
+	auto rootNodeDispatchGrid = workGraphSubobject->CreateBroadcastingLaunchNodeOverrides(L"EntryFunction");
+	rootNodeDispatchGrid->DispatchGrid(m_width, m_height, 1);
+
 	// create shader library
 	auto lib = stateObjectDesc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
 	D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void*)g_pWorkGraphRaytracing, ARRAYSIZE(g_pWorkGraphRaytracing));
@@ -336,7 +339,7 @@ void RenderDevice::CreateWorkGraph()
 	// GetEntrypointIndex allows us to translate from a node ID (i.e., node name and node array index)
 	// to an entrypoint index.
 	// See https://microsoft.github.io/DirectX-Specs/d3d/WorkGraphs.html#getentrypointindex
-	m_workGraphEntryPointIndex = workGraphProperties->GetEntrypointIndex(workGraphIndex, { L"Entry", 0 });
+	m_workGraphEntryPointIndex = workGraphProperties->GetEntrypointIndex(workGraphIndex, { L"EntryFunction", 0 });
 
 	// Check if entrypoint was found.
 	if (m_workGraphEntryPointIndex == 0xFFFFFFFFU) {
