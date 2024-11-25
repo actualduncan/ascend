@@ -287,7 +287,7 @@ void RenderDevice::CreateWorkGraph()
 	workGraphSubobject->SetProgramName(WorkGraphProgramName);
 
 	auto rootNodeDispatchGrid = workGraphSubobject->CreateBroadcastingLaunchNodeOverrides(L"EntryFunction");
-	rootNodeDispatchGrid->DispatchGrid(m_width, m_height, 1);
+	rootNodeDispatchGrid->DispatchGrid(ceil(m_width /8), ceil(m_height/8), 1);
 
 	// create shader library
 	auto lib = stateObjectDesc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();

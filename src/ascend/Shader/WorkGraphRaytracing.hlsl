@@ -16,7 +16,7 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 [NodeLaunch("broadcasting")]
 [NodeIsProgramEntry]
 [NodeDispatchGrid(1, 1, 1)] // This will be overridden during pipeline creation
-[numthreads(1, 1, 1)]
+[numthreads(8, 8, 1)]
 void EntryFunction(uint3 DTid : SV_DispatchThreadID)
 {
     float3 dtfloat = float3(DTid.xyz);
@@ -24,7 +24,7 @@ void EntryFunction(uint3 DTid : SV_DispatchThreadID)
     RayDesc ray;
 
     // need to replace with viewport and width in constant buffer
-    ray.Origin = float3(lerp(-1.0, 1.0, dtfloat.x / 1280.0), lerp(-1.0, 1.0, dtfloat.y / 800.0), 0.0);
+    ray.Origin = float3(lerp(-1.0, 1.0, dtfloat.x / 1280.0), lerp(-1.0, 1.0, dtfloat.y / 800.0 ), 0.0);
     ray.Direction = float3(0, 0, 1);
     ray.TMin = 0.01;
     ray.TMax = 100000;
