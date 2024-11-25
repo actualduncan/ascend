@@ -98,6 +98,7 @@ add_dependencies(ascend CompileShaders)
 file(GLOB_RECURSE AGILITY_HEADERS "${AGILITY_INCLUDE}/*.h*" )
 file(GLOB_RECURSE DXC_HEADERS "${DXC_INCLUDE}/*.h*" )
 file( COPY ${SHADER_SOURCE_DIR} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug )
+file( COPY "${AGILITY_DLL}/" DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug )
 
 target_sources(ascend PRIVATE ${SOURCES})
 target_sources(ascend PRIVATE ${AGILITY_HEADERS})
