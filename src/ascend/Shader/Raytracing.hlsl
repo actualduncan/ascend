@@ -19,9 +19,10 @@ RWTexture2D<float4> RenderTarget : register(u0);
 ConstantBuffer<RayGenConstantBuffer> g_rayGenCB : register(b0);
 
 typedef BuiltInTriangleIntersectionAttributes MyAttributes;
-struct RayPayload
+
+struct [raypayload] RayPayload
 {
-    float4 color;
+    float4 color : read(caller) : write(closesthit, miss, caller);
 };
 
 bool IsInsideViewport(float2 p, Viewport viewport)

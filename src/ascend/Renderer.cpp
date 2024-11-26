@@ -6,6 +6,7 @@
 #include "imgui/imgui_impl_dx12.h"
 #include "Shader/CompiledShaders/Raytracing.hlsl.h"
 #include "Shader/CompiledShaders/ComputeRaytracing.hlsl.h"
+#include "Shader/CompiledShaders/WorkGraphRaytracing.hlsl.h"
 
 /*
 												WARNING
@@ -13,6 +14,13 @@
 									The code is therefore very messy.
 		Most of this code is adapted from https://github.com/microsoft/DirectX-Graphics-Samples
  */
+
+extern "C" {
+	__declspec(dllexport) extern const unsigned int D3D12SDKVersion = 613;
+}
+extern "C" {
+	__declspec(dllexport) extern const char* D3D12SDKPath = ".\\";
+}
 
 const wchar_t* RenderDevice::c_hitGroupName = L"MyHitGroup";
 const wchar_t* RenderDevice::c_raygenShaderName = L"MyRaygenShader";
@@ -64,12 +72,22 @@ bool RenderDevice::Initialize(HWND hwnd)
 
 	CreateFrameResources();
 
-	LoadComputeAssets();
-
+	CreateWorkGraphRootSignature();
+	CreateWorkGraph();
 	WaitForGPU();
 	CreateRaytracingInterfaces();
 	BuildGeometry();
 	BuildAccelerationStructuresForCompute();
+
+#pragma region COMPUTE
+	//LoadComputeAssets();
+
+	//WaitForGPU();
+	//CreateRaytracingInterfaces();
+
+	//BuildGeometry();
+	//BuildAccelerationStructuresForCompute();
+#pragma endregion
 #pragma region RAY_TRACING
 	//CreateDeviceDependentResources();
 	//CreateWindowSizeDependentResources();
@@ -101,13 +119,14 @@ void RenderDevice::InitializeDebugDevice()
 		m_adapter->GetDesc3(&desc);
 
 		// Device that supports D3D12 is found
-		if (SUCCEEDED(D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&m_device))))
+		if (SUCCEEDED(D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_12_2, IID_PPV_ARGS(&m_device))))
 		{
 			break;
 		}
 	}
 
 #if DEBUG
+	
 	ComPtr<ID3D12InfoQueue1> infoQueue;
 	if (SUCCEEDED(m_device->QueryInterface(IID_PPV_ARGS(&infoQueue))))
 	{
@@ -119,6 +138,7 @@ void RenderDevice::InitializeDebugDevice()
 		pInfoQueue->Release();
 		m_debugController->Release();
 	}
+	
 #endif //DEBUG
 
 }
@@ -233,8 +253,9 @@ void RenderDevice::CreateFrameResources()
 	VERIFYD3D12RESULT(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_commandAllocators[0].Get(), nullptr, IID_PPV_ARGS(&m_commandList)));
 
 	// compute
+#pragma region COMPUTE
 	VERIFYD3D12RESULT(m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COMPUTE, m_computeCommandAllocators[0].Get(), nullptr, IID_PPV_ARGS(&m_computeCommandList)));
-
+#pragma endregion
 	m_commandList->Close();
 	m_computeCommandList->Close();
 
@@ -250,6 +271,170 @@ void RenderDevice::CreateFrameResources()
 		VERIFYD3D12RESULT(HRESULT_FROM_WIN32(GetLastError()));
 	}
 }
+
+
+void RenderDevice::CreateWorkGraph()
+{
+	static const wchar_t* WorkGraphProgramName = L"WorkGraph";
+
+	CD3DX12_STATE_OBJECT_DESC stateObjectDesc(D3D12_STATE_OBJECT_TYPE_EXECUTABLE);
+
+	auto rootSignatureSubobject = stateObjectDesc.CreateSubobject<CD3DX12_GLOBAL_ROOT_SIGNATURE_SUBOBJECT>();
+	rootSignatureSubobject->SetRootSignature(m_workGraphRootSignature.Get());
+
+	auto workGraphSubobject = stateObjectDesc.CreateSubobject<CD3DX12_WORK_GRAPH_SUBOBJECT>();
+	workGraphSubobject->IncludeAllAvailableNodes();
+	workGraphSubobject->SetProgramName(WorkGraphProgramName);
+
+	auto rootNodeDispatchGrid = workGraphSubobject->CreateBroadcastingLaunchNodeOverrides(L"EntryFunction");
+	rootNodeDispatchGrid->DispatchGrid(ceil(m_width /8), ceil(m_height/8), 1);
+
+	// create shader library
+	auto lib = stateObjectDesc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
+	D3D12_SHADER_BYTECODE libdxil = CD3DX12_SHADER_BYTECODE((void*)g_pWorkGraphRaytracing, ARRAYSIZE(g_pWorkGraphRaytracing));
+	lib->SetDXILLibrary(&libdxil);
+
+	VERIFYD3D12RESULT(m_device->CreateStateObject(stateObjectDesc, IID_PPV_ARGS(&m_workGraphStateObject)));
+
+	ComPtr<ID3D12StateObjectProperties1> stateObjectProperties;
+	ComPtr<ID3D12WorkGraphProperties>    workGraphProperties;
+
+	VERIFYD3D12RESULT(m_workGraphStateObject->QueryInterface(IID_PPV_ARGS(&stateObjectProperties)));
+	VERIFYD3D12RESULT(m_workGraphStateObject->QueryInterface(IID_PPV_ARGS(&workGraphProperties)));
+
+	// Get the index of our work graph inside the state object (state object can contain multiple work graphs)
+	const auto workGraphIndex = workGraphProperties->GetWorkGraphIndex(WorkGraphProgramName);
+
+	D3D12_WORK_GRAPH_MEMORY_REQUIREMENTS memoryRequirements = {};
+	workGraphProperties->GetWorkGraphMemoryRequirements(workGraphIndex, &memoryRequirements);
+
+	// Work graphs can also request no backing memory (i.e., MaxSizeInBytes = 0)
+	if (memoryRequirements.MaxSizeInBytes > 0) {
+		CD3DX12_HEAP_PROPERTIES heapProperties(D3D12_HEAP_TYPE_DEFAULT);
+		CD3DX12_RESOURCE_DESC   resourceDesc = CD3DX12_RESOURCE_DESC::Buffer(memoryRequirements.MaxSizeInBytes,
+			D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		VERIFYD3D12RESULT(m_device->CreateCommittedResource(&heapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&resourceDesc,
+			D3D12_RESOURCE_STATE_COMMON,
+			NULL,
+			IID_PPV_ARGS(&m_workGraphBackingMemory)));
+	}
+
+	// Prepare work graph desc
+    // See https://microsoft.github.io/DirectX-Specs/d3d/WorkGraphs.html#d3d12_set_program_desc
+	m_workGraphProgramDesc.Type = D3D12_PROGRAM_TYPE_WORK_GRAPH;
+	m_workGraphProgramDesc.WorkGraph.ProgramIdentifier = stateObjectProperties->GetProgramIdentifier(WorkGraphProgramName);
+	// Set flag to initialize backing memory.
+	// We'll clear this flag once we've run the work graph for the first time.
+	m_workGraphProgramDesc.WorkGraph.Flags = D3D12_SET_WORK_GRAPH_FLAG_INITIALIZE;
+	// Set backing memory
+	if (m_workGraphBackingMemory) {
+		m_workGraphProgramDesc.WorkGraph.BackingMemory.StartAddress = m_workGraphBackingMemory->GetGPUVirtualAddress();
+		m_workGraphProgramDesc.WorkGraph.BackingMemory.SizeInBytes = m_workGraphBackingMemory->GetDesc().Width;
+	}
+
+	// All tutorial work graphs must declare a node named "Entry" with an empty record (i.e., no input record).
+	// The D3D12_DISPATCH_GRAPH_DESC uses entrypoint indices instead of string-based node IDs to reference the enty node.
+	// GetEntrypointIndex allows us to translate from a node ID (i.e., node name and node array index)
+	// to an entrypoint index.
+	// See https://microsoft.github.io/DirectX-Specs/d3d/WorkGraphs.html#getentrypointindex
+	m_workGraphEntryPointIndex = workGraphProperties->GetEntrypointIndex(workGraphIndex, { L"EntryFunction", 0 });
+
+	// Check if entrypoint was found.
+	if (m_workGraphEntryPointIndex == 0xFFFFFFFFU) {
+		throw std::runtime_error("work graph does not contain an entry node with [NodeId(\"Entry\", 0)].");
+	}
+
+}
+
+void RenderDevice::CreateWorkGraphRootSignature()
+{
+	CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
+	UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+	CD3DX12_ROOT_PARAMETER rootParameters[2];
+	rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
+	rootParameters[1].InitAsShaderResourceView(0);
+
+	ComPtr<ID3DBlob> signature;
+	ComPtr<ID3DBlob> error;
+
+	CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc(ARRAYSIZE(rootParameters), rootParameters);
+
+	VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
+	VERIFYD3D12RESULT(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_workGraphRootSignature)))
+
+	{
+		m_workGraphDescriptorSize = m_device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		VERIFYD3D12RESULT(m_device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_workGraphOutput)));
+
+
+		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(m_srvHeap->GetCPUDescriptorHandleForHeapStart(), 0, m_workGraphDescriptorSize);
+		//m_raytracingOutputResourceUAVDescriptorHeapIndex = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, descriptorIndexToUse, m_computeDescriptorSize);
+		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
+		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		m_device->CreateUnorderedAccessView(m_workGraphOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
+		m_workGraphOutputUavDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(m_srvHeap->GetGPUDescriptorHandleForHeapStart());
+	}
+
+}
+
+void RenderDevice::DispatchWorkGraph()
+{
+	m_commandList->SetComputeRootSignature(m_workGraphRootSignature.Get());
+	//D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
+	m_commandList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
+	m_commandList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_workGraphOutputUavDescriptorHandle);
+	m_commandList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
+
+
+	
+
+
+	D3D12_DISPATCH_GRAPH_DESC dispatchDesc = {};
+	dispatchDesc.Mode = D3D12_DISPATCH_MODE_NODE_CPU_INPUT;
+	dispatchDesc.NodeCPUInput = {};
+	dispatchDesc.NodeCPUInput.EntrypointIndex = m_workGraphEntryPointIndex;
+	// Launch graph with one record
+	dispatchDesc.NodeCPUInput.NumRecords = 1;
+	// Record does not contain any data
+	dispatchDesc.NodeCPUInput.RecordStrideInBytes = 0;
+	dispatchDesc.NodeCPUInput.pRecords = nullptr;
+
+	// Set program and dispatch the work graphs.
+	// See
+	// https://microsoft.github.io/DirectX-Specs/d3d/WorkGraphs.html#setprogram
+	// https://microsoft.github.io/DirectX-Specs/d3d/WorkGraphs.html#dispatchgraph
+
+	m_commandList->SetProgram(&m_workGraphProgramDesc);
+	m_commandList->DispatchGraph(&dispatchDesc);
+
+	// Clear backing memory initialization flag, as the graph has run at least once now
+	// See https://microsoft.github.io/DirectX-Specs/d3d/WorkGraphs.html#d3d12_set_work_graph_flags
+	m_workGraphProgramDesc.WorkGraph.Flags &= ~D3D12_SET_WORK_GRAPH_FLAG_INITIALIZE;
+}
+
+void RenderDevice::CopyWorkGraphOutputToBackBuffer()
+{
+	D3D12_RESOURCE_BARRIER preCopyBarriers[2];
+	preCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST);
+	preCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE);
+	m_commandList->ResourceBarrier(ARRAYSIZE(preCopyBarriers), preCopyBarriers);
+
+	m_commandList->CopyResource(m_renderTargets[m_frameIndex].Get(), m_workGraphOutput.Get());
+
+	D3D12_RESOURCE_BARRIER postCopyBarriers[2];
+	postCopyBarriers[0] = CD3DX12_RESOURCE_BARRIER::Transition(m_renderTargets[m_frameIndex].Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET);
+	postCopyBarriers[1] = CD3DX12_RESOURCE_BARRIER::Transition(m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS);
+
+	m_commandList->ResourceBarrier(ARRAYSIZE(postCopyBarriers), postCopyBarriers);
+}
+
+#pragma region COMPUTE
 void RenderDevice::LoadComputeAssets()
 {
 	{
@@ -259,14 +444,10 @@ void RenderDevice::LoadComputeAssets()
 		rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
 		rootParameters[1].InitAsShaderResourceView(0);
 
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init_1_1(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
-		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
-		VERIFYD3D12RESULT(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature)));
+
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc(ARRAYSIZE(rootParameters), rootParameters);
-		//desc.Init_1_1(0, rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 
 		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
 		VERIFYD3D12RESULT(m_device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_computeRootSignature)))
@@ -376,7 +557,7 @@ void RenderDevice::BuildAccelerationStructuresForCompute()
 
 
 	ComPtr<ID3D12Resource> scratchResource;
-	AllocateUAVBuffer(m_device.Get(), max(topLevelPrebuildInfo.ScratchDataSizeInBytes, bottomLevelPrebuildInfo.ScratchDataSizeInBytes), &scratchResource, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, L"ScratchResource");
+	AllocateUAVBuffer(m_device.Get(), max(topLevelPrebuildInfo.ScratchDataSizeInBytes, bottomLevelPrebuildInfo.ScratchDataSizeInBytes), &scratchResource, D3D12_RESOURCE_STATE_COMMON, L"ScratchResource");
 
 	// Allocate resources for acceleration structures.
 	// Acceleration structures can only be placed in resources that are created in the default heap (or custom heap equivalent). 
@@ -436,6 +617,8 @@ void RenderDevice::BuildAccelerationStructuresForCompute()
 	// Wait for GPU to finish as the locally created temporary GPU resources will get released once we go out of scope.
 	WaitForGPU();
 }
+
+#pragma endregion
 
 #pragma region RAY_TRACING
 void RenderDevice::CreateDeviceDependentResources()
@@ -871,8 +1054,8 @@ void RenderDevice::OnRender()
 	//DoRaytracing();
 	//CopyRaytracingOutputToBackbuffer();
 #pragma endregion
-	DoCompute();
-	CopyComputeOutputToBackBuffer();
+	DispatchWorkGraph();
+	CopyWorkGraphOutputToBackBuffer();
 	//ImGui::Render();
 	PopulateCommandLists();
 

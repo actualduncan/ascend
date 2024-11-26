@@ -8,7 +8,7 @@ function(nuget_get_agility_sdk IN_TARGET OUT_SUCCEEDED OUT_INCLUDE_PATH OUT_BINA
 
     set(MAJOR_VER "1")
     set(MINOR_VER "613")
-    set(PATCH_VER "1")
+    set(PATCH_VER "3")
 
     nuget_pkg_get(${IN_TARGET} "Microsoft.Direct3D.D3D12" "${MAJOR_VER}.${MINOR_VER}.${PATCH_VER}" ${OUT_SUCCEEDED} PKG_PATH)
 
@@ -23,7 +23,7 @@ endfunction()
 
 function(nuget_get_dxc IN_TARGET OUT_SUCCEEDED OUT_INCLUDE_PATH OUT_BINARY_PATH OUT_LIB_PATH)
 
-    nuget_pkg_get(${IN_TARGET} "Microsoft.Direct3D.DXC" "1.8.2403.21" ${OUT_SUCCEEDED} PKG_PATH)
+    nuget_pkg_get(${IN_TARGET} "Microsoft.Direct3D.DXC" "1.8.2407.11" ${OUT_SUCCEEDED} PKG_PATH)
 
     if (${${OUT_SUCCEEDED}})
         set(${OUT_INCLUDE_PATH} "${PKG_PATH}/build/native/include")

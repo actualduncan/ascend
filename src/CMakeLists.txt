@@ -7,7 +7,7 @@ asset_dependency_init(ascend)
 
 
 nuget_initialize(ascend)
-nuget_get_agility_sdk(ShaderTestFramework AGILITY_FOUND AGILITY_INCLUDE AGILITY_DLL SDK_VER)
+nuget_get_agility_sdk(ascend AGILITY_FOUND AGILITY_INCLUDE AGILITY_DLL SDK_VER)
 nuget_get_dxc(ascend DXC_FOUND DXC_INCLUDE DXC_DLL DXC_LIB)
 #nuget_get_warp(ShaderTestFramework WARP_FOUND WARP_DLL)
 #nuget_get_WinPixEventRuntime(ShaderTestFramework WINPIX_FOUND WINPIX_INCLUDE WINPIX_BIN)
@@ -45,7 +45,7 @@ set(SOURCES ascend/main.cpp
 )
 
 # TODO: Move to .cmake file for shader compiling - Reduce code duplication.
-set(HLSL_LIB_SHADER_FILES ascend/Shader/Raytracing.hlsl)
+set(HLSL_LIB_SHADER_FILES ascend/Shader/Raytracing.hlsl ascend/Shader/WorkGraphRaytracing.hlsl)
 set(HLSL_CS_SHADER_FILES  ascend/Shader/ComputeRaytracing.hlsl)
 set(SHADER_FILES ${HLSL_LIB_SHADER_FILES} 					  
 				 ${HLSL_CS_SHADER_FILES}
@@ -75,7 +75,7 @@ foreach(FILE ${HLSL_LIB_SHADER_FILES})
   get_filename_component(FILE_WE ${FILE} NAME_WE)
   list(APPEND CSO_SHADER_FILES ${CMAKE_BINARY_DIR}/${FILE_WE}.cso)
 	add_custom_command(TARGET CompileShaders
-		COMMAND "dxc.exe" /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T lib_6_3 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
+		COMMAND "${DXC_DLL}/dxc.exe" /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T lib_6_8 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
 		             MAIN_DEPENDENCY ${FILE}
                      COMMENT "HLSL ${FILE}"
                      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -86,7 +86,7 @@ foreach(FILE ${HLSL_CS_SHADER_FILES})
   get_filename_component(FILE_WE ${FILE} NAME_WE)
   list(APPEND CSO_SHADER_FILES ${CMAKE_BINARY_DIR}/${FILE_WE}.cso)
 	add_custom_command(TARGET CompileShaders
-		COMMAND "dxc.exe" /E CSMain /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T cs_6_5 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
+		COMMAND "${DXC_DLL}/dxc.exe" /E CSMain /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T cs_6_8 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
 		             MAIN_DEPENDENCY ${FILE}
                      COMMENT "HLSL ${FILE}"
                      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
@@ -98,6 +98,7 @@ add_dependencies(ascend CompileShaders)
 file(GLOB_RECURSE AGILITY_HEADERS "${AGILITY_INCLUDE}/*.h*" )
 file(GLOB_RECURSE DXC_HEADERS "${DXC_INCLUDE}/*.h*" )
 file( COPY ${SHADER_SOURCE_DIR} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug )
+file( COPY "${AGILITY_DLL}/" DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug )
 
 target_sources(ascend PRIVATE ${SOURCES})
 target_sources(ascend PRIVATE ${AGILITY_HEADERS})

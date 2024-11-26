@@ -1,8 +1,8 @@
 #pragma once
 #include <iostream>
-#include <d3d12.h>
+#include <d3dx12/d3dx12.h>
 #include <dxgi1_6.h>
-#include <d3dx12/d3dx12.h> // include d3d
+#include <dxgidebug.h>// include d3d
 #include <wrl.h>
 #include <DirectXMath.h>
 #include "Shader/RaytracingHlslCompat.h"
@@ -57,7 +57,26 @@ private:
 	UINT m_width = 1280;
 	UINT m_height = 800;
 	float m_aspectRatio;
+#pragma region WORK_GRAPHS
+	ComPtr<ID3D12RootSignature> m_workGraphRootSignature;
+	ComPtr<ID3D12PipelineState> m_workGraphPipelineState;
+	ComPtr<ID3D12Resource> m_workGraphOutput;
+	ComPtr<ID3D12Resource>    m_workGraphBackingMemory;
+	//ComPtr<ID3D12Fence> m_computeFence;
 
+	ComPtr<ID3D12StateObject> m_workGraphStateObject;
+	D3D12_SET_PROGRAM_DESC    m_workGraphProgramDesc = {};
+	std::uint32_t             m_workGraphEntryPointIndex;
+	D3D12_GPU_DESCRIPTOR_HANDLE m_workGraphOutputUavDescriptorHandle;
+	UINT m_workGraphOutputUavDescriptorIndex;
+	UINT m_workGraphDescriptorSize;
+
+	void CreateWorkGraphRootSignature();
+	void CreateWorkGraph();
+	void DispatchWorkGraph();
+	void CopyWorkGraphOutputToBackBuffer();
+
+#pragma endregion
 #pragma region RAY_TRACING
 	// Raytracing
 	void CreateRaytracingInterfaces();
@@ -109,8 +128,8 @@ private:
 
 #pragma endregion
 
-#pragma region COMPUTE_PIPELINE
-	ComPtr<ID3D12CommandQueue> m_computeCommandQueue;
+#pragma region COMPUTE
+    ComPtr<ID3D12CommandQueue> m_computeCommandQueue;
 	ComPtr<ID3D12GraphicsCommandList> m_computeCommandList;
 	ComPtr<ID3D12CommandAllocator> m_computeCommandAllocators[RendererPrivate::MAX_FRAMES];
 	ComPtr<ID3D12RootSignature> m_computeRootSignature;
@@ -118,7 +137,6 @@ private:
 	ComPtr<ID3D12Resource> m_computeOutput;
 	ComPtr<ID3D12Fence> m_computeFence;
 	D3D12_GPU_DESCRIPTOR_HANDLE m_computeOutputUavDescriptorHandle;
-	UINT m_computeOutputUavDescriptorIndex;
 	UINT m_compute;
 	UINT m_computeDescriptorSize;
 
@@ -129,7 +147,7 @@ private:
 #pragma endregion
 
 	// others
-	ComPtr<ID3D12Device> m_device;
+	ComPtr<ID3D12Device9> m_device;
 	ComPtr<IDXGIAdapter4> m_adapter;
 	ComPtr<IDXGIFactory7> m_factory;
 	ComPtr<IDXGISwapChain4> m_swapChain;
@@ -141,7 +159,7 @@ private:
 	ComPtr<ID3D12RootSignature> m_rootSignature;
 	ComPtr<ID3D12PipelineState> m_pipelineState;
 	ComPtr<ID3D12CommandAllocator> m_commandAllocators[RendererPrivate::MAX_FRAMES];
-	ComPtr<ID3D12GraphicsCommandList> m_commandList;
+	ComPtr<ID3D12GraphicsCommandList10> m_commandList;
 	ComPtr<ID3D12Fence> m_fence;
 
 	// Primitives
