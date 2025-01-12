@@ -19,6 +19,16 @@ set_target_properties(DXC PROPERTIES
 
 
 set(SOURCES ascend/main.cpp 
+			ascend/WorkGraphsDXR.h
+			ascend/WorkGraphsDXR.cpp
+			ascend/DX12/DX12.h
+			ascend/DX12/DX12.cpp
+			ascend/DX12/DX12_Helpers.h
+			ascend/DX12/DX12_Helpers.cpp
+			ascend/DX12/GraphicsTypes.h
+			ascend/DX12/GraphicsTypes.cpp
+			ascend/DX12/SwapChain.h
+			ascend/DX12/SwapChain.cpp
 			ascend/ascendHelpers.h
 			ascend/Renderer.cpp 
 			ascend/Renderer.h 
