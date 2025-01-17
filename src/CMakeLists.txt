@@ -29,6 +29,7 @@ set(SOURCES ascend/main.cpp
 			ascend/DX12/GraphicsTypes.cpp
 			ascend/DX12/SwapChain.h
 			ascend/DX12/SwapChain.cpp
+			ascend/DX12/PCH.h
 			ascend/ascendHelpers.h
 			ascend/Renderer.cpp 
 			ascend/Renderer.h 
