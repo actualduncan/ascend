@@ -142,7 +142,6 @@ namespace DX12
 		UAVDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
 		/*
-
 		CreateFrameResources();
 
 		CreateWorkGraphRootSignature();
@@ -163,5 +162,24 @@ namespace DX12
 	void EndFrame()
 	{
 
+	}
+
+	// maybe move to another file
+	D3D12_RESOURCE_BARRIER MakeTransitionBarrier(ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after, uint32_t subResource)
+	{
+		D3D12_RESOURCE_BARRIER barrier = { };
+		barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+		barrier.Flags = D3D12_RESOURCE_BARRIER_FLAG_NONE;
+		barrier.Transition.pResource = resource;
+		barrier.Transition.StateBefore = before;
+		barrier.Transition.StateAfter = after;
+		barrier.Transition.Subresource = subResource;
+		return barrier;
+	}
+
+	void TransitionResource(ID3D12GraphicsCommandList* cmdList, ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after, uint32_t subResource)
+	{
+		D3D12_RESOURCE_BARRIER barrier = MakeTransitionBarrier(resource, before, after, subResource);
+		cmdList->ResourceBarrier(1, &barrier);
 	}
 }
