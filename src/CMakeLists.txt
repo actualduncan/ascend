@@ -19,13 +19,17 @@ set_target_properties(DXC PROPERTIES
 
 
 set(SOURCES ascend/main.cpp 
-			ascend/ascendHelpers.h
-			ascend/Renderer.cpp 
-			ascend/Renderer.h 
-			ascend/RayTracingRHI.cpp
-			ascend/RayTracingRHI.h 
-			ascend/WindowsApplication.cpp 
-			ascend/WindowsApplication.h
+			ascend/WorkGraphsDXR.h
+			ascend/WorkGraphsDXR.cpp
+			ascend/DX12/DX12.h
+			ascend/DX12/DX12.cpp
+			ascend/DX12/DX12_Helpers.h
+			ascend/DX12/DX12_Helpers.cpp
+			ascend/DX12/GraphicsTypes.h
+			ascend/DX12/GraphicsTypes.cpp
+			ascend/DX12/SwapChain.h
+			ascend/DX12/SwapChain.cpp
+			ascend/DX12/PCH.h
 			ascend/imgui/imconfig.h
 			ascend/imgui/imgui.cpp
 			ascend/imgui/imgui.h

@@ -2,11 +2,11 @@
 #include <d3d12.h>
 #include <wrl.h>
 #include "WinUser.h"
-#include "Renderer.h"
+#include "WorkGraphsDXR.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
 static HWND hwnd = NULL;
-RenderDevice* Device = nullptr;
+WorkGraphsDXR* WorkGraphsDXR_app = nullptr;
 bool CreateWindowsApplication(int wHeight, int wWidth, HINSTANCE hInstance, int nCmdShow);
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
@@ -15,15 +15,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
     {
         IMGUI_CHECKVERSION();
         //ImGui::CreateContext();
-       // ImGuiIO& io = ImGui::GetIO();
+        // ImGuiIO& io = ImGui::GetIO();
         //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;     // Enable Keyboard Controls
-       // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
+        // io.ConfigFlags |= ImGuiConfigFlags_NavEnableGamepad;      // Enable Gamepad Controls
         //io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
         //io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
         //ImGui_ImplWin32_Init(hwnd);
-        Device = new RenderDevice();
-        Device->Initialize(hwnd);
+        WorkGraphsDXR_app = new WorkGraphsDXR();
+        WorkGraphsDXR_app->Initialize(hwnd, 1280, 800);
 
         // Application loop
         bool done = false;
@@ -41,7 +41,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
             if (done)
                 break;
 
-            Device->OnRender();
+            WorkGraphsDXR_app->Render();
         }
         return 0;
 
@@ -51,6 +51,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
    
     return 0;
 }
+
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
