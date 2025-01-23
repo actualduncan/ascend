@@ -1,7 +1,13 @@
 # includes from https://github.com/KStocky/ShaderTestFramework
 include(NugetPackages)
 include(AssetDependencyManagement)
-
+include(FetchContent)
+FetchContent_Declare(
+	assimp
+	GIT_REPOSITORY https://github.com/assimp/assimp.git
+	GIT_TAG 	   v5.4.3
+	)
+FetchContent_MakeAvailable(assimp)
 add_executable(ascend WIN32)
 asset_dependency_init(ascend)
 
@@ -16,6 +22,8 @@ add_library(DXC SHARED IMPORTED)
 set_target_properties(DXC PROPERTIES
     IMPORTED_IMPLIB "${DXC_LIB}/dxcompiler.lib"
 )
+
+
 
 
 set(SOURCES ascend/main.cpp 
@@ -123,7 +131,7 @@ source_group(TREE ${SHADER_SOURCE_DIR} PREFIX "ShaderSources" FILES ${SHADER_FIL
 target_compile_definitions(ascend PRIVATE D3D12_SDK_VERSION_ID=${SDK_VER} SHADER_SRC="${SHADER_SOURCE_REL_DIR}", ImTextureID=ImU64)
 target_include_directories(ascend PUBLIC . ${CMAKE_CURRENT_LIST_DIR}/Public/ ${AGILITY_INCLUDE} ${DXC_INCLUDE})
 target_include_directories(ascend PUBLIC . ${SHADER_SOURCE_DIR}/CompiledShaders/)
-target_link_libraries(ascend PRIVATE d3d12.lib dxgi.lib d3dcompiler.lib DXC dxguid.lib)
+target_link_libraries(ascend PRIVATE assimp d3d12.lib dxgi.lib d3dcompiler.lib DXC dxguid.lib)
 
 target_add_asset_directory(ascend ${AGILITY_DLL} "/D3D12")
 target_add_asset_directory(ascend ${DXC_DLL} "/")
