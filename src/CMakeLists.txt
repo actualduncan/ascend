@@ -21,6 +21,8 @@ set_target_properties(DXC PROPERTIES
 set(SOURCES ascend/main.cpp 
 			ascend/WorkGraphsDXR.h
 			ascend/WorkGraphsDXR.cpp
+			ascend/Model.h
+			ascend/Model.cpp
 			ascend/DX12/DX12.h
 			ascend/DX12/DX12.cpp
 			ascend/DX12/DX12_Helpers.h
