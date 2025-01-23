@@ -69,17 +69,9 @@ void WorkGraphsDXR::Render()
 	{
 		BuildAccelerationStructuresForCompute();
 	}
-	else
-	{
-		DispatchWorkGraph();
-		CopyWorkGraphOutputToBackBuffer();
-	}
-
-
-	
-
-
-
+		
+	DispatchWorkGraph();	
+	CopyWorkGraphOutputToBackBuffer();
 
 	m_swapChain.EndFrame();
 	DX12::EndFrame(m_swapChain.GetD3DObject());
