@@ -14,8 +14,11 @@ SwapChain::~SwapChain()
 
 void SwapChain::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 {
+	m_width = width;
+	m_height = height;
+
 	// first output
-	DX12::Adapter->EnumOutputs(0, &m_output);
+	DX12::Adapter->EnumOutputs(1, &m_output);
 
 	DXGI_SWAP_CHAIN_DESC1 desc = { };
 	desc.BufferCount = BACK_BUFFER_NUM;
@@ -33,9 +36,10 @@ void SwapChain::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 
 	ComPtr<IDXGISwapChain1> tempSwapChain = nullptr;
 
-	VERIFYD3D12RESULT(DX12::Factory->CreateSwapChainForHwnd(DX12::Device.Get(), hwnd, &desc, nullptr, m_output.Get(), &tempSwapChain));
+	VERIFYD3D12RESULT(DX12::Factory->CreateSwapChainForHwnd(DX12::GraphicsQueue.Get(), hwnd, &desc, nullptr, m_output.Get(), &tempSwapChain));
 	VERIFYD3D12RESULT(tempSwapChain.As(&m_swapChain));
-
+	//VERIFYD3D12RESULT(m_factory->CreateSwapChainForHwnd(m_commandQueue.Get(), m_hwnd, &swapChainDesc, nullptr, nullptr, &swapChain1));	// use CreateSwapChainForCoreWindow for Windows Store apps
+	//VERIFYD3D12RESULT(swapChain1.As(&m_swapChain));
 	m_backBufferIdx = m_swapChain->GetCurrentBackBufferIndex();
 	m_waitableObject = m_swapChain->GetFrameLatencyWaitableObject();
 
@@ -46,7 +50,7 @@ void SwapChain::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 
 		VERIFYD3D12RESULT(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBufferRT[i])));
 
-		wchar_t name[25] = {};
+		wchar_t name[30] = {};
 		swprintf_s(name, L"SwapChain Render target %u", i);
 		m_backBufferRT[i]->SetName(name);
 

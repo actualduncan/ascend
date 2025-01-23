@@ -1,3 +1,4 @@
+#pragma once
 #include <dxgi1_6.h>
 #include <d3dx12/d3dx12.h>
 #include <stdexcept>
@@ -6,16 +7,8 @@ using Microsoft::WRL::ComPtr;
 
 #define SizeOfInUint32(obj) ((sizeof(obj) - 1) / sizeof(UINT32) + 1)
 
-void VerifyD3D12Result(HRESULT D3DResult, const char* code, const char* Filename, INT32 Line)
-{
-    if (FAILED(D3DResult))
-    {
-        char message[60];
-        sprintf(message, "D3D12 ERROR: %s failed at %s:%u\nWith the ERROR %08X \n", code, Filename, Line, (INT32)D3DResult);
-        OutputDebugStringA(message);
-        exit(0);
-    }
-}
+void VerifyD3D12Result(HRESULT D3DResult, const char* code, const char* Filename, INT32 Line);
+
 
 #define VERIFYD3D12RESULT(x) \
 { \
@@ -56,17 +49,8 @@ inline void SetName(ID3D12Object* pObject, LPCWSTR name)
 #define NAME_D3D12_OBJECT(x) SetName((x).Get(), L#x)
 
 // refactor function to calculate asset path on init
-std::wstring GetShader(LPCWSTR shaderFile)
-{
-    std::wstring shaderPath = L"/Shader/";
-    WCHAR path[512];
-    shaderPath += shaderFile;
-    GetAssetPath(path, _countof(path));
-    std::wstring assetPaths = path;
-    shaderPath = assetPaths + shaderPath;
+std::wstring GetShader(LPCWSTR shaderFile);
 
-    return shaderPath;
-}
 
 inline UINT Align(UINT size, UINT alignment)
 {

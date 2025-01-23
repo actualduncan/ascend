@@ -1,6 +1,7 @@
 #include "PCH.h"
 #include "DX12.h"
 
+
 class SwapChain
 {
 public:
@@ -10,6 +11,7 @@ public:
 	void Initialize(HWND hwnd, uint32_t width, uint32_t height);
 
 	IDXGISwapChain4* GetD3DObject() { return m_swapChain.Get(); }
+	ID3D12Resource* BackBuffer() const { return m_backBufferRT[m_backBufferIdx].Get(); };
 
 	void StartFrame();
 	void EndFrame();
@@ -30,7 +32,7 @@ private:
 
 	ComPtr<IDXGIOutput> m_output;
 
-	DXGI_FORMAT m_format;
+	DXGI_FORMAT m_format = DXGI_FORMAT_R8G8B8A8_UNORM;
 	
 	uint32_t m_width = 1280;
 	uint32_t m_height = 720;

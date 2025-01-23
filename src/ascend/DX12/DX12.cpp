@@ -1,6 +1,8 @@
 #include "DX12.h"
 #include "DX12_Helpers.h"
+#include "GraphicsTypes.h"
 #include "PCH.h"
+
 extern "C" {
 	__declspec(dllexport) extern const unsigned int D3D12SDKVersion = 613;
 }
@@ -18,9 +20,7 @@ namespace DX12
 	ComPtr<ID3D12Device9> Device = nullptr;
 	ComPtr<ID3D12CommandList> CmdList = nullptr;
 	ComPtr<ID3D12CommandQueue> GraphicsQueue = nullptr;
-	ComPtr<ID3D12CommandQueue> ComputeQueue = nullptr;
-	ComPtr<ID3D12GraphicsCommandList4> GraphicsCmdList = nullptr;
-	ComPtr<ID3D12GraphicsCommandList4> ComputeCmdList = nullptr;
+	ComPtr<ID3D12GraphicsCommandList10> GraphicsCmdList = nullptr;
 
 	UINT64 CurrentCPUFrame;
 	UINT64 CurrentGPUFrame;
@@ -28,9 +28,8 @@ namespace DX12
 
 	static const uint64_t NumCmdAllocators = RenderLatency;
 	static ComPtr<ID3D12CommandAllocator> GraphicsCmdAllocators[NumCmdAllocators] = { };
-	static ComPtr<ID3D12CommandAllocator> ComputeCmdAllocators[NumCmdAllocators] = { };
 
-	ComPtr<ID3D12Fence> FrameFence = nullptr;
+	static Fence FrameFence;
 
 	UINT RTVDescriptorSize = 0;
 	UINT UAVDescriptorSize = 0;
@@ -41,7 +40,6 @@ namespace DX12
 
 	void Initialize(D3D_FEATURE_LEVEL minFeatureLevel)
 	{
-
 		// check feature levels
 
 		VERIFYD3D12RESULT(CreateDXGIFactory1(IID_PPV_ARGS(&Factory)));
@@ -62,48 +60,40 @@ namespace DX12
 
 		VERIFYD3D12RESULT(D3D12CreateDevice(Adapter.Get(), minFeatureLevel, IID_PPV_ARGS(&Device)));
 
-		// Check Feature Level Support
-		D3D12_FEATURE_DATA_FEATURE_LEVELS featureLevelData = {};
-		featureLevelData.pFeatureLevelsRequested = &minFeatureLevel;
-		featureLevelData.NumFeatureLevels = 1;
-		Device->CheckFeatureSupport(D3D12_FEATURE_FEATURE_LEVELS, &featureLevelData, 1);
-		MaxSupportedFeatureLevel = featureLevelData.MaxSupportedFeatureLevel;
+
+		CD3DX12FeatureSupport features;
+		features.Init(Device.Get());
+
+		MaxSupportedFeatureLevel = features.MaxSupportedFeatureLevel();
+
+		// Check D3D12 Feature Level support
 		if (MaxSupportedFeatureLevel < minFeatureLevel)
 		{
 			throw std::exception("Feature level Not supported");
 		}
 
 		// Check Shader Model Support
-		D3D12_FEATURE_DATA_SHADER_MODEL shaderModel = { D3D_SHADER_MODEL_6_6 };
-		VERIFYD3D12RESULT(Device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModel, sizeof(shaderModel)));
-		if (shaderModel.HighestShaderModel < D3D_SHADER_MODEL_6_6)
+		if (features.HighestShaderModel() < D3D_SHADER_MODEL_6_6)
 		{
 			throw std::exception("The device does not support the minimum shader model required to run (Shader Model 6.6)");
 		}
 
 		// Check DXR Support
-		D3D12_FEATURE_DATA_D3D12_OPTIONS5 opts5 = { };
-		VERIFYD3D12RESULT(Device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS5, &opts5, sizeof(opts5)));
-		if (opts5.RaytracingTier < D3D12_RAYTRACING_TIER_1_1)
+		if (features.RaytracingTier() < D3D12_RAYTRACING_TIER_1_1)
 		{
 			throw std::exception("The device does not support DXR 1.1, which is required to run.");
 		}
-
 
 		// Initialize Command Lists and Allocators
 		for (int i = 0; i < NumCmdAllocators; ++i)
 		{
 			VERIFYD3D12RESULT(Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&GraphicsCmdAllocators[i])));
-			VERIFYD3D12RESULT(Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COMPUTE, IID_PPV_ARGS(&ComputeCmdAllocators[i])));
+			GraphicsCmdAllocators[i]->SetName(L"Graphics Command Allocator");
 		}
 
 		VERIFYD3D12RESULT(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, GraphicsCmdAllocators[0].Get(), nullptr, IID_PPV_ARGS(&GraphicsCmdList)));
 		VERIFYD3D12RESULT(GraphicsCmdList->Close());
 		GraphicsCmdList->SetName(L"Main Graphics Command List");
-
-		VERIFYD3D12RESULT(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COMPUTE, ComputeCmdAllocators[0].Get(), nullptr, IID_PPV_ARGS(&ComputeCmdList)));
-		VERIFYD3D12RESULT(ComputeCmdList->Close());
-		ComputeCmdList->SetName(L"Main Compute Command List");
 
 		// Initialize Graphics & Compute Queues
 		D3D12_COMMAND_QUEUE_DESC gQueueDesc = {};
@@ -112,19 +102,13 @@ namespace DX12
 		VERIFYD3D12RESULT(Device->CreateCommandQueue(&gQueueDesc, IID_PPV_ARGS(&GraphicsQueue)));
 		GraphicsQueue.Get()->SetName(L"Main Graphics Queue");
 
-		D3D12_COMMAND_QUEUE_DESC cQueueDesc = {};
-		cQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_COMPUTE;
-		cQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-		VERIFYD3D12RESULT(Device->CreateCommandQueue(&cQueueDesc, IID_PPV_ARGS(&ComputeQueue)));
-		ComputeQueue.Get()->SetName(L"Main Compute Queue");
-
 		CurrentFrameIdx = CurrentCPUFrame % NumCmdAllocators;
 
 		VERIFYD3D12RESULT(GraphicsCmdAllocators[CurrentFrameIdx]->Reset());
-		VERIFYD3D12RESULT(ComputeCmdAllocators[CurrentFrameIdx]->Reset());
 		VERIFYD3D12RESULT(GraphicsCmdList->Reset(GraphicsCmdAllocators[CurrentFrameIdx].Get(), nullptr));
-		VERIFYD3D12RESULT(ComputeCmdList->Reset(GraphicsCmdAllocators[CurrentFrameIdx].Get(), nullptr));
 
+
+		FrameFence.Init(0);
 
 		// Create Descriptors
 		D3D12_DESCRIPTOR_HEAP_DESC RTVDescriptorHeapDesc = { };
@@ -135,33 +119,68 @@ namespace DX12
 		RTVDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 		D3D12_DESCRIPTOR_HEAP_DESC UAVDescriptorHeapDesc = { };
-		RTVDescriptorHeapDesc.NumDescriptors = RenderLatency;
-		RTVDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-
-		VERIFYD3D12RESULT(Device->CreateDescriptorHeap(&RTVDescriptorHeapDesc, IID_PPV_ARGS(&UAVDescriptorHeap)));
+		UAVDescriptorHeapDesc.NumDescriptors = RenderLatency;
+		UAVDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
+		UAVDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
+		
+		VERIFYD3D12RESULT(Device->CreateDescriptorHeap(&UAVDescriptorHeapDesc, IID_PPV_ARGS(&UAVDescriptorHeap)));
 		UAVDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-		/*
-		CreateFrameResources();
-
-		CreateWorkGraphRootSignature();
-		CreateWorkGraph();
-		WaitForGPU();
-		CreateRaytracingInterfaces();
-		BuildGeometry();
-		BuildAccelerationStructuresForCompute();
-		*/
-		
 	}
 
 	void StartFrame()
 	{
-
+		GraphicsCmdList->SetDescriptorHeaps(1, UAVDescriptorHeap.GetAddressOf());
 	}
 
-	void EndFrame()
+	void EndFrame(IDXGISwapChain4* swapChain)
 	{
+		// Close cmd list now that 
+		VERIFYD3D12RESULT(GraphicsCmdList->Close());
 
+		ID3D12CommandList* graphicsCommandLists[] = { 
+			GraphicsCmdList.Get()
+		};
+
+		GraphicsQueue->ExecuteCommandLists(ARRAYSIZE(graphicsCommandLists), graphicsCommandLists);
+
+
+		if (swapChain)
+		{
+			VERIFYD3D12RESULT(swapChain->Present(1, 0));
+		}
+
+		++CurrentCPUFrame;
+
+		//fence here
+		FrameFence.Signal(GraphicsQueue.Get(), CurrentCPUFrame);
+		//change frame index
+
+		// Wait for the GPU to catch up before we stomp an executing command buffer
+		const uint64_t gpuLag = DX12::CurrentCPUFrame - DX12::CurrentGPUFrame;
+	
+		if (gpuLag >= DX12::RenderLatency)
+		{
+			// Make sure that the previous frame is finished
+			FrameFence.Wait(DX12::CurrentGPUFrame + 1);
+			++DX12::CurrentGPUFrame;
+		}
+
+		//reset command allocators and command lists for next frame.
+		CurrentFrameIdx = DX12::CurrentCPUFrame % NumCmdAllocators;
+
+
+		VERIFYD3D12RESULT(GraphicsCmdAllocators[CurrentFrameIdx]->Reset());
+		VERIFYD3D12RESULT(GraphicsCmdList->Reset(GraphicsCmdAllocators[CurrentFrameIdx].Get(), nullptr));
+	}
+
+	void WaitForGPU()
+	{
+		if (CurrentCPUFrame > CurrentGPUFrame)
+		{
+			FrameFence.Wait(CurrentCPUFrame);
+			CurrentGPUFrame = CurrentCPUFrame;
+		}
 	}
 
 	// maybe move to another file
@@ -181,5 +200,11 @@ namespace DX12
 	{
 		D3D12_RESOURCE_BARRIER barrier = MakeTransitionBarrier(resource, before, after, subResource);
 		cmdList->ResourceBarrier(1, &barrier);
+	}
+
+	void Reset()
+	{
+		//VERIFYD3D12RESULT(GraphicsCmdList->Reset(GraphicsCmdAllocators[CurrentFrameIdx].Get(), nullptr));
+		//VERIFYD3D12RESULT(ComputeCmdList->Reset(GraphicsCmdAllocators[CurrentFrameIdx].Get(), nullptr));
 	}
 }
