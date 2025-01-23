@@ -30,13 +30,6 @@ set(SOURCES ascend/main.cpp
 			ascend/DX12/SwapChain.h
 			ascend/DX12/SwapChain.cpp
 			ascend/DX12/PCH.h
-			ascend/ascendHelpers.h
-			ascend/Renderer.cpp 
-			ascend/Renderer.h 
-			ascend/RayTracingRHI.cpp
-			ascend/RayTracingRHI.h 
-			ascend/WindowsApplication.cpp 
-			ascend/WindowsApplication.h
 			ascend/imgui/imconfig.h
 			ascend/imgui/imgui.cpp
 			ascend/imgui/imgui.h

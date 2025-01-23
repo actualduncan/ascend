@@ -2,11 +2,11 @@
 #include <d3d12.h>
 #include <wrl.h>
 #include "WinUser.h"
-#include "Renderer.h"
+#include "WorkGraphsDXR.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
 static HWND hwnd = NULL;
-RenderDevice* Device = nullptr;
+WorkGraphsDXR* WorkGraphsDXR_app = nullptr;
 bool CreateWindowsApplication(int wHeight, int wWidth, HINSTANCE hInstance, int nCmdShow);
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
@@ -22,8 +22,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
         //io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
         //ImGui_ImplWin32_Init(hwnd);
-        Device = new RenderDevice();
-        Device->Initialize(hwnd);
+        WorkGraphsDXR_app = new WorkGraphsDXR();
+        WorkGraphsDXR_app->Initialize(hwnd, 1280, 800);
 
         // Application loop
         bool done = false;
@@ -41,7 +41,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
             if (done)
                 break;
 
-            Device->OnRender();
+            WorkGraphsDXR_app->Render();
         }
         return 0;
 
