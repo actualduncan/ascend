@@ -25,6 +25,7 @@ namespace LocalRootSignatureParams {
 // DXR
 
 WorkGraphsDXR::WorkGraphsDXR()
+	: m_shouldBuildAccelerationStructures(true)
 {
 
 }
@@ -40,14 +41,18 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_height = height;
 	DX12::Initialize(D3D_FEATURE_LEVEL_12_2);
 	m_swapChain.Initialize(hwnd, width, height);
-	bunny = new Model("D:/_dev/_ascend/ascend/build/src/Debug/Shader/teapot.obj");
+
 	CreateWorkGraphRootSignature();
 	CreateWorkGraph();
 	DX12::WaitForGPU();
 	CreateRaytracingInterfaces();
-	BuildGeometry();
-	//BuildAccelerationStructuresForCompute();
-	
+
+	LoadModels();
+}
+
+void WorkGraphsDXR::LoadModels()
+{
+	m_teapot = std::make_unique<Model>("debug/Shader/teapot.obj");
 }
 
 void WorkGraphsDXR::Update(float dt)
@@ -65,17 +70,13 @@ void WorkGraphsDXR::Render()
 	DX12::StartFrame();
 	m_swapChain.StartFrame();
 
-	if (!accelStructBuilt)
+	if (m_shouldBuildAccelerationStructures)
 	{
 		BuildAccelerationStructuresForCompute();
 	}
-	else
-	{
-		DispatchWorkGraph();
-		CopyWorkGraphOutputToBackBuffer();
-	}
-		
 
+	DispatchWorkGraph();
+	CopyWorkGraphOutputToBackBuffer();
 
 	m_swapChain.EndFrame();
 	DX12::EndFrame(m_swapChain.GetD3DObject());
@@ -248,77 +249,35 @@ void WorkGraphsDXR::CreateRaytracingInterfaces()
 
 void WorkGraphsDXR::BuildAccelerationStructuresForCompute()
 {
-	// Reset the command list for the acceleration structure construction.
-	DX12::Reset();
-	
-	std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescs(bunny->meshCount);
-	for (int i = 0; i < bunny->meshCount; ++i)
+	const uint64_t modelMeshCount = m_teapot->GetModelMeshVector().size();
+	std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescs(modelMeshCount);
+	for (int i = 0; i < modelMeshCount; ++i)
 	{
 		geometryDescs[i].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-		geometryDescs[i].Triangles.IndexBuffer = bunny->indbuf->GetGPUVirtualAddress() + bunny->meshes[i].indexOffset;
-		geometryDescs[i].Triangles.IndexCount = bunny->meshes[i].numIndices;
-		geometryDescs[i].Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
-		geometryDescs[i].Triangles.Transform3x4 = 0;
 		geometryDescs[i].Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-		geometryDescs[i].Triangles.VertexCount = bunny->meshes[i].numVertices;
-		geometryDescs[i].Triangles.VertexBuffer.StartAddress = bunny->vertbuf->GetGPUVirtualAddress() + bunny->meshes[i].vertexOffset;
-		geometryDescs[i].Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
-		geometryDescs[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-		/*
+		geometryDescs[i].Triangles.VertexCount = m_teapot->GetModelMeshVector()[i].numVertices;;
+		geometryDescs[i].Triangles.VertexBuffer.StartAddress = m_teapot->GetVertexBuffer().BufferLocation + m_teapot->GetModelMeshVector()[i].vertexOffset;
+		geometryDescs[i].Triangles.VertexBuffer.StrideInBytes = m_teapot->GetVertexBuffer().StrideInBytes;
+		geometryDescs[i].Triangles.Transform3x4 = 0;
+		geometryDescs[i].Triangles.IndexBuffer = m_teapot->GetIndexBuffer().BufferLocation + m_teapot->GetModelMeshVector()[i].indexOffset;
+		geometryDescs[i].Triangles.IndexCount = m_teapot->GetModelMeshVector()[i].numIndices;
+		geometryDescs[i].Triangles.IndexFormat = m_teapot->GetIndexBuffer().Format;
 
-		geometryDescs[i].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
-geometryDescs[i].Triangles.IndexBuffer = bunny->indbuf->GetGPUVirtualAddress() + bunny->meshes[i].indexOffset;
-geometryDescs[i].Triangles.IndexCount = bunny->meshes[i].numIndices;
-geometryDescs[i].Triangles.IndexFormat = DXGI_FORMAT_R16_UINT;
-geometryDescs[i].Triangles.Transform3x4 = 0;
-geometryDescs[i].Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-geometryDescs[i].Triangles.VertexCount = bunny->meshes[i].numVertices;
-geometryDescs[i].Triangles.VertexBuffer.StartAddress = bunny->vertbuf->GetGPUVirtualAddress() + bunny->meshes[i].vertexOffset;
-geometryDescs[i].Triangles.VertexBuffer.StrideInBytes = sizeof(Vertex);
-geometryDescs[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
-*/
+		geometryDescs[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 	}
 
-
-	// Mark the geometry as opaque. 
-	// PERFORMANCE TIP: mark geometry as opaque whenever applicable as it can enable important ray processing optimizations.
-	// Note: When rays encounter opaque geometry an any hit shader will not be executed whether it is present or not.
-
-
-	/*
-	// Get required sizes for an acceleration structure.
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS topLevelInputs = {};
-	topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-	topLevelInputs.Flags = buildFlags;
-	topLevelInputs.NumDescs = 1;
-	topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo = {};
-	m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
-
-
-	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo = {};
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS bottomLevelInputs = topLevelInputs;
-	bottomLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
-	bottomLevelInputs.pGeometryDescs = &geometryDesc;
-	m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&bottomLevelInputs, &bottomLevelPrebuildInfo);
-
-	*/
-
+	// Build TLAS
+	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelAccelerationStructureDesc = {};
+	topLevelAccelerationStructureDesc.Inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
+	topLevelAccelerationStructureDesc.Inputs.NumDescs = modelMeshCount;
+	topLevelAccelerationStructureDesc.Inputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
+	topLevelAccelerationStructureDesc.Inputs.pGeometryDescs = nullptr;
+	topLevelAccelerationStructureDesc.Inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 
 	D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO topLevelPrebuildInfo;
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC topLevelAccelerationStructureDesc = {};
-	D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_INPUTS& topLevelInputs = topLevelAccelerationStructureDesc.Inputs;
-	topLevelInputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL;
-	topLevelInputs.NumDescs = bunny->meshCount;
-	topLevelInputs.Flags = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-	topLevelInputs.pGeometryDescs = nullptr;
-	topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
-	m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelInputs, &topLevelPrebuildInfo);
+	m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&topLevelAccelerationStructureDesc.Inputs, &topLevelPrebuildInfo);
 
 	const D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS buildFlag = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG_PREFER_FAST_TRACE;
-	//std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescs(model.m_Header.meshCount);
 	UINT64 scratchBufferSizeNeeded = topLevelPrebuildInfo.ScratchDataSizeInBytes;
 
 
@@ -337,17 +296,13 @@ geometryDescs[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 	topLevelAccelerationStructureDesc.DestAccelerationStructureData = m_topLevelAccelerationStructure->GetGPUVirtualAddress();
 	topLevelAccelerationStructureDesc.ScratchAccelerationStructureData = tlasScratchBuffer.GetGpuVirtualAddress();
 
-	//AllocateUAVBuffer(DX12::Device.Get(), max(topLevelPrebuildInfo.ScratchDataSizeInBytes, bottomLevelPrebuildInfo.ScratchDataSizeInBytes), &scratchResource, D3D12_RESOURCE_STATE_COMMON, L"ScratchResource");
-	 //
-	// Define the bottom level acceleration structures
-	//
+	// Build BLAS
+	m_bottomLevelAccelerationStructures.resize(modelMeshCount);
+	blasScratchBuffers.resize(modelMeshCount);
+	std::vector<D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC> blasDescs(modelMeshCount);
+	std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instanceDesc(modelMeshCount);
 
-	m_bottomLevelAccelerationStructures.resize(bunny->meshCount);
-	std::vector<D3D12_BUILD_RAYTRACING_ACCELERATION_STRUCTURE_DESC> blasDescs(bunny->meshCount);
-	std::vector<D3D12_RAYTRACING_INSTANCE_DESC> instanceDesc(bunny->meshCount);
-	blasScratchBuffers.resize(bunny->meshCount);
-
-	for (UINT i = 0; i < bunny->meshCount; i++)
+	for (UINT i = 0; i < modelMeshCount; i++)
 	{
 		blasDescs[i].Inputs.Type = D3D12_RAYTRACING_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL;
 		blasDescs[i].Inputs.NumDescs = 1;
@@ -356,8 +311,7 @@ geometryDescs[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 		blasDescs[i].Inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 
 		D3D12_RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO bottomLevelPrebuildInfo;
-		// bottom level prebuild info returns zero!
-		// probably due my buffer math lol
+
 		m_dxrDevice->GetRaytracingAccelerationStructurePrebuildInfo(&blasDescs[i].Inputs, &bottomLevelPrebuildInfo);
 
 		D3D12_RESOURCE_DESC blasBufferDesc = {};
@@ -376,6 +330,7 @@ geometryDescs[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
 		blasScratchBuffers[i].Create(L"BLAS build scratch buffer", (UINT)bottomLevelPrebuildInfo.ScratchDataSizeInBytes, 1);
 		blasDescs[i].ScratchAccelerationStructureData = blasScratchBuffers[i].GetGpuVirtualAddress();
+
 		// Identity matrix
 		ZeroMemory(instanceDesc[i].Transform, sizeof(instanceDesc[i].Transform));
 		instanceDesc[i].Transform[0][0] = 1.0f;
@@ -391,8 +346,9 @@ geometryDescs[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 	}
 
 	AllocateUploadBuffer(DX12::Device.Get(), instanceDesc.data(), instanceDesc.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC), &instanceDescs, L"InstanceDescs");
-	topLevelInputs.InstanceDescs = instanceDescs->GetGPUVirtualAddress();
-	topLevelInputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
+
+	topLevelAccelerationStructureDesc.Inputs.InstanceDescs = instanceDescs->GetGPUVirtualAddress();
+	topLevelAccelerationStructureDesc.Inputs.DescsLayout = D3D12_ELEMENTS_LAYOUT_ARRAY;
 
 	auto uavBarrier = CD3DX12_RESOURCE_BARRIER::UAV(nullptr);
 	for (UINT i = 0; i < blasDescs.size(); i++)
@@ -406,43 +362,5 @@ geometryDescs[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 
 	m_dxrCommandList->ResourceBarrier(1, &uavBarrier);
 	m_dxrCommandList->BuildRaytracingAccelerationStructure(&topLevelAccelerationStructureDesc, 0, nullptr);
-	accelStructBuilt = true;
-
-	/*
-	auto BuildAccelerationStructure = [&](auto* raytracingCommandList)
-		{
-			CD3DX12_RESOURCE_BARRIER barrier = CD3DX12_RESOURCE_BARRIER::UAV(m_bottomLevelAccelerationStructure.Get());
-			raytracingCommandList->BuildRaytracingAccelerationStructure(&blasDesc, 0, nullptr);
-			DX12::GraphicsCmdList->ResourceBarrier(1, &barrier);
-			raytracingCommandList->BuildRaytracingAccelerationStructure(&topLevelAccelerationStructureDesc, 0, nullptr);
-		};
-		*/
-
-	// Build acceleration structure.
-	//BuildAccelerationStructure(m_dxrCommandList.Get());
-
-}
-
-void WorkGraphsDXR::BuildGeometry()
-{
-	Index indices[] =
-	{
-		0, 1, 2
-	};
-
-	float depthValue = 1.0;
-	float offset = 0.7f;
-	Vertex vertices[] =
-	{
-		// The sample raytraces in screen space coordinates.
-		// Since DirectX screen space coordinates are right handed (i.e. Y axis points down).
-		// Define the vertices in counter clockwise order ~ clockwise in left handed.
-		{ 0, -offset, depthValue },
-		{ -offset, offset, depthValue },
-		{ offset, offset, depthValue }
-	};
-
-
-	AllocateUploadBuffer(DX12::Device.Get(), vertices, sizeof(vertices), &m_vertexBuffer);
-	AllocateUploadBuffer(DX12::Device.Get(), indices, sizeof(indices), &m_indexBuffer);
+	m_shouldBuildAccelerationStructures = false;
 }

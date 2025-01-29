@@ -10,24 +10,24 @@ public:
 	
 
 	void Initialize(HWND hwnd, uint32_t width, uint32_t height);
+	void LoadModels();
 	void Update(float dt);
 	void Render();
 	void ImGUI();
-	void BuildGeometry();
 
 private:
 	SwapChain m_swapChain;
 
-
 	ComPtr<ID3D12Resource> m_indexBuffer;
 	ComPtr<ID3D12Resource> m_vertexBuffer;
+
+	std::unique_ptr<Model> m_teapot;
 
 #pragma region WORK_GRAPHS
 	ComPtr<ID3D12RootSignature> m_workGraphRootSignature;
 	ComPtr<ID3D12PipelineState> m_workGraphPipelineState;
 	ComPtr<ID3D12Resource> m_workGraphOutput;
 	ComPtr<ID3D12Resource>    m_workGraphBackingMemory;
-	//ComPtr<ID3D12Fence> m_computeFence;
 
 	ComPtr<ID3D12StateObject> m_workGraphStateObject;
 	D3D12_SET_PROGRAM_DESC    m_workGraphProgramDesc = {};
@@ -56,11 +56,10 @@ private:
 	uint32_t m_width;
 	uint32_t m_height;
 
-	bool accelStructBuilt = false;
+	bool m_shouldBuildAccelerationStructures;
 
 	ComPtr<ID3D12Resource> scratchResource;
 	ComPtr<ID3D12Resource> instanceDescs;
 	GpuBuffer tlasScratchBuffer;
 	std::vector<GpuBuffer> blasScratchBuffers;
-	Model* bunny;
 };

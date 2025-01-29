@@ -14,11 +14,8 @@ Model::~Model()
 
 void Model::ImportModel(const std::string& pFile)
 {
-	// Create an instance of the Importer class
 	Assimp::Importer importer;
-	// And have it read the given file with some example postprocessing
-	// Usually - if speed is not the most important aspect for you - you'll
-	// probably to request more postprocessing than we do in this example.
+
 	const aiScene* scene = importer.ReadFile(pFile,
 		aiProcess_CalcTangentSpace |
 		aiProcess_Triangulate |
@@ -30,7 +27,6 @@ void Model::ImportModel(const std::string& pFile)
 
 	if (scene)
 	{
-
 		// Initialize the meshes
 		const uint64_t numMeshes = scene->mNumMeshes;
 	
@@ -54,16 +50,13 @@ void Model::ImportModel(const std::string& pFile)
 		for (uint64_t i = 0; i < numMeshes; ++i)
 		{
 			InitFromAssimpMesh(*scene->mMeshes[i], &vertices[vtxOffset], &indices[idxOffset]);
-			meshCount++;
 
-			vtxOffset += meshes[i].numVertices;
-			idxOffset += meshes[i].numIndices;
+			vtxOffset += m_modelMeshes[i].numVertices;
+			idxOffset += m_modelMeshes[i].numIndices;
 		}
 
 		CreateBuffers();	
 	}
-
-	
 }
 
 void Model::CreateBuffers()
@@ -71,7 +64,7 @@ void Model::CreateBuffers()
 	uint64_t vertexBufferSize = 0;
 	uint64_t indexBufferSize = 0;
 
-	for (auto it = meshes.begin(); it < meshes.end(); ++it)
+	for (auto it = m_modelMeshes.begin(); it < m_modelMeshes.end(); ++it)
 	{
 		it->vertexOffset = vertexBufferSize;
 		it->indexOffset = indexBufferSize;
@@ -80,10 +73,11 @@ void Model::CreateBuffers()
 		indexBufferSize += it->numIndices * sizeof(Index);
 	}
 
-	AllocateUploadBuffer(DX12::Device.Get(), vertices, vertexBufferSize, &vertbuf);
-	AllocateUploadBuffer(DX12::Device.Get(), indices, indexBufferSize, &indbuf);
+	AllocateUploadBuffer(DX12::Device.Get(), vertices, vertexBufferSize, &m_vertexBuffer);
+	AllocateUploadBuffer(DX12::Device.Get(), indices, indexBufferSize, &m_indexBuffer);
 
 }
+
 void Model::InitFromAssimpMesh(const aiMesh& assimpMesh, Vertex* dstVertices, Index* dstIndices)
 {
 	Mesh mesh;
@@ -101,6 +95,7 @@ void Model::InitFromAssimpMesh(const aiMesh& assimpMesh, Vertex* dstVertices, In
 
 		dstVertices[i] = vert;
 	}
+
 	const uint64_t numTriangles = assimpMesh.mNumFaces;
 	for (uint64_t triIdx = 0; triIdx < numTriangles; ++triIdx)
 	{
@@ -109,70 +104,25 @@ void Model::InitFromAssimpMesh(const aiMesh& assimpMesh, Vertex* dstVertices, In
 		dstIndices[triIdx * 3 + 2] = UINT16(assimpMesh.mFaces[triIdx].mIndices[2]);
 	}
 
-	meshes.push_back(mesh);
+	m_modelMeshes.push_back(mesh);
 }
 
-/**
-void Model::ProcessNode(const aiNode* node, const aiScene* scene)
+D3D12_VERTEX_BUFFER_VIEW Model::GetVertexBuffer()
 {
-	for (UINT i = 0; i < node->mNumMeshes; i++)
-	{
-		aiMesh* mesh = scene->mMeshes[node->mMeshes[i]];
-		ProcessMesh(mesh, scene);
-	}
+	D3D12_VERTEX_BUFFER_VIEW vbView = {};
 
-	for (UINT i = 0; i < node->mNumChildren; i++)
-	{
-		this->ProcessNode(node->mChildren[i], scene);
-	}
+	vbView.BufferLocation = m_vertexBuffer->GetGPUVirtualAddress();
+	vbView.SizeInBytes = m_vertexBuffer->GetDesc().Width;
+	vbView.StrideInBytes = sizeof(Vertex);
+	return vbView;
 }
 
-void Model::ProcessMesh(const aiMesh* mesh, const aiScene* scene)
+D3D12_INDEX_BUFFER_VIEW Model::GetIndexBuffer()
 {
-	
+	D3D12_INDEX_BUFFER_VIEW ibView = {};
 
-	for (UINT i = 0; i < mesh->mNumVertices; i++)
-	{
-		Vertex vert(0.0f, 0.0f, 0.0f);
-		XMFLOAT2 text(0.0f,0.0f);
-		XMFLOAT3 norm(0.0f, 0.0f, 0.0f);
-
-		vert.v1 = mesh->mVertices[i].x;
-		vert.v2 = mesh->mVertices[i].y;
-		vert.v3 = mesh->mVertices[i].z;
-
-		if (mesh->HasTextureCoords(0))
-		{
-			text.x = (float)mesh->mTextureCoords[0][i].x;
-			text.y = (float)mesh->mTextureCoords[0][i].y;
-		}
-
-		if (mesh->HasNormals())
-		{
-			norm.x = mesh->mNormals[i].x;
-			norm.y = mesh->mNormals[i].y;
-			norm.z = mesh->mNormals[i].z;
-		}
-
-		Vertex vertex;
-		vertex = vert;
-		//vertex.texture = text;
-		//vertex.normal = norm;
-
-	}
-
-
-	
-	for (UINT i = 0; i < mesh->mNumFaces; i++)
-	{
-		aiFace face = mesh->mFaces[i];
-
-		for (UINT j = 0; j < face.mNumIndices; j++)
-		{
-			newMesh.Indices[i * 3 + j] = UINT16(face.mIndices[j]);
-			indSize++;
-		}
-	}
-
+	ibView.BufferLocation = m_indexBuffer->GetGPUVirtualAddress();
+	ibView.SizeInBytes = m_indexBuffer->GetDesc().Width;
+	ibView.Format = DXGI_FORMAT_R16_UINT;
+	return ibView;
 }
-*/
