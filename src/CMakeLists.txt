@@ -1,9 +1,20 @@
 # includes from https://github.com/KStocky/ShaderTestFramework
 include(NugetPackages)
 include(AssetDependencyManagement)
-
+include(FetchContent)
+FetchContent_Declare(
+	assimp
+	GIT_REPOSITORY https://github.com/assimp/assimp.git
+	GIT_TAG 	   v5.4.3
+	)
+FetchContent_MakeAvailable(assimp)
 add_executable(ascend WIN32)
 asset_dependency_init(ascend)
+
+set(ASSIMP_BUILD_LIB ${CMAKE_BINARY_DIR}/_deps/assimp-build/lib/debug/assimp-vc143-mtd.lib)
+set(ASSIMP_BUILD_DLL ${CMAKE_BINARY_DIR}/_deps/assimp-build/bin/Debug/assimp-vc143-mtd.dll)
+set(ASSIMP_CONFIG_DIR ${CMAKE_BINARY_DIR}/_deps/assimp-build/include/)
+set(ASSIMP_INCLUDE_DIR ${assimp_SOURCE_DIR}/include/)
 
 
 nuget_initialize(ascend)
@@ -18,9 +29,13 @@ set_target_properties(DXC PROPERTIES
 )
 
 
+
+
 set(SOURCES ascend/main.cpp 
 			ascend/WorkGraphsDXR.h
 			ascend/WorkGraphsDXR.cpp
+			ascend/Model.h
+			ascend/Model.cpp
 			ascend/DX12/DX12.h
 			ascend/DX12/DX12.cpp
 			ascend/DX12/DX12_Helpers.h
@@ -103,6 +118,7 @@ file(GLOB_RECURSE AGILITY_HEADERS "${AGILITY_INCLUDE}/*.h*" )
 file(GLOB_RECURSE DXC_HEADERS "${DXC_INCLUDE}/*.h*" )
 file( COPY ${SHADER_SOURCE_DIR} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug )
 file( COPY "${AGILITY_DLL}/" DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug )
+file( COPY "${ASSIMP_BUILD_DLL}/" DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug )
 
 target_sources(ascend PRIVATE ${SOURCES})
 target_sources(ascend PRIVATE ${AGILITY_HEADERS})
@@ -110,8 +126,6 @@ target_sources(ascend PRIVATE ${DXC_HEADERS})
 target_sources(ascend PRIVATE ${SHADER_FILES})
 
 set_source_files_properties(${SHADER_FILES}  PROPERTIES VS_SETTINGS "ExcludedFromBuild=true")
-
-
 
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} PREFIX "Source" FILES ${SOURCES})
 source_group(TREE ${AGILITY_INCLUDE} PREFIX "ThirdParty/AgilitySDK" FILES ${AGILITY_HEADERS})
@@ -121,11 +135,13 @@ source_group(TREE ${SHADER_SOURCE_DIR} PREFIX "ShaderSources" FILES ${SHADER_FIL
 target_compile_definitions(ascend PRIVATE D3D12_SDK_VERSION_ID=${SDK_VER} SHADER_SRC="${SHADER_SOURCE_REL_DIR}", ImTextureID=ImU64)
 target_include_directories(ascend PUBLIC . ${CMAKE_CURRENT_LIST_DIR}/Public/ ${AGILITY_INCLUDE} ${DXC_INCLUDE})
 target_include_directories(ascend PUBLIC . ${SHADER_SOURCE_DIR}/CompiledShaders/)
-target_link_libraries(ascend PRIVATE d3d12.lib dxgi.lib d3dcompiler.lib DXC dxguid.lib)
+target_include_directories(ascend PUBLIC . ${ASSIMP_CONFIG_DIR})
+target_include_directories(ascend PUBLIC . ${ASSIMP_INCLUDE_DIR})
+target_link_libraries(ascend PRIVATE  ${ASSIMP_BUILD_LIB} d3d12.lib dxgi.lib d3dcompiler.lib DXC dxguid.lib)
 
 target_add_asset_directory(ascend ${AGILITY_DLL} "/D3D12")
 target_add_asset_directory(ascend ${DXC_DLL} "/")
-
+target_add_asset_directory(ascend ${ASSIMP_BUILD_DLL} "/")
 add_definitions(-DUNICODE -D_UNICODE)
 add_compile_definitions(DEBUG)
 

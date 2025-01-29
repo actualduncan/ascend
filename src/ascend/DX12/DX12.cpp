@@ -98,7 +98,7 @@ namespace DX12
 		// Initialize Graphics & Compute Queues
 		D3D12_COMMAND_QUEUE_DESC gQueueDesc = {};
 		gQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-		gQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+		gQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_DISABLE_GPU_TIMEOUT;
 		VERIFYD3D12RESULT(Device->CreateCommandQueue(&gQueueDesc, IID_PPV_ARGS(&GraphicsQueue)));
 		GraphicsQueue.Get()->SetName(L"Main Graphics Queue");
 
