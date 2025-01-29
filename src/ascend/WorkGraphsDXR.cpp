@@ -46,7 +46,8 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	CreateWorkGraph();
 	DX12::WaitForGPU();
 	CreateRaytracingInterfaces();
-
+	float aspectRatio = float(width) / float(height);
+	m_camera = std::make_unique<Camera>(hwnd, aspectRatio);
 	LoadModels();
 }
 

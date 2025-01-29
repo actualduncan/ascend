@@ -36,6 +36,8 @@ set(SOURCES ascend/main.cpp
 			ascend/WorkGraphsDXR.cpp
 			ascend/Model.h
 			ascend/Model.cpp
+			ascend/Camera.h
+			ascend/Camera.cpp
 			ascend/DX12/DX12.h
 			ascend/DX12/DX12.cpp
 			ascend/DX12/DX12_Helpers.h

@@ -1,6 +1,6 @@
 #include "DX12/SwapChain.h"
 #include "Model.h"
-
+#include "Camera.h"
 class WorkGraphsDXR
 {
 public:
@@ -22,6 +22,7 @@ private:
 	ComPtr<ID3D12Resource> m_vertexBuffer;
 
 	std::unique_ptr<Model> m_teapot;
+	std::unique_ptr<Camera> m_camera;
 
 #pragma region WORK_GRAPHS
 	ComPtr<ID3D12RootSignature> m_workGraphRootSignature;
