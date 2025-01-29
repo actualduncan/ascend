@@ -38,6 +38,7 @@ set(SOURCES ascend/main.cpp
 			ascend/Model.cpp
 			ascend/Camera.h
 			ascend/Camera.cpp
+			ascend/InputCommands.h
 			ascend/DX12/DX12.h
 			ascend/DX12/DX12.cpp
 			ascend/DX12/DX12_Helpers.h

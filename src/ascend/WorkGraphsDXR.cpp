@@ -56,8 +56,10 @@ void WorkGraphsDXR::LoadModels()
 	m_teapot = std::make_unique<Model>("debug/Shader/teapot.obj");
 }
 
-void WorkGraphsDXR::Update(float dt)
+void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
 {
+	// get this frame's input
+	m_input = *inputCommands;
 	// imgui frame
 	// other stuff
 }

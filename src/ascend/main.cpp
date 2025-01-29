@@ -5,8 +5,13 @@
 #include "WorkGraphsDXR.h"
 #include "imgui/imgui.h"
 #include "imgui/imgui_impl_win32.h"
+#include "InputCommands.h"
+
 static HWND hwnd = NULL;
 WorkGraphsDXR* WorkGraphsDXR_app = nullptr;
+InputCommands appInput;
+char m_keyArray[256];
+
 bool CreateWindowsApplication(int wHeight, int wWidth, HINSTANCE hInstance, int nCmdShow);
 
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
@@ -40,7 +45,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
             }
             if (done)
                 break;
-
+            WorkGraphsDXR_app->Update(0.1f, &appInput);
             WorkGraphsDXR_app->Render();
         }
         return 0;
@@ -65,9 +70,63 @@ LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lPara
         PostQuitMessage(0);
         return 0;
     case WM_PAINT:
-        
         break;
+    case WM_KEYDOWN:
+        m_keyArray[wParam] = true;
+        break;
+
+    case WM_KEYUP:
+        m_keyArray[wParam] = false;
+        break;
+    case WM_MOUSEMOVE:
+        POINT p;
+        if (GetCursorPos(&p))
+        {
+            appInput.mouseX = p.x;
+            appInput.mouseY = p.y;
+        }
+        break;
+    case WM_LBUTTONDOWN:
+        appInput.mouseLButtonDown = true;
+        break;
+    case WM_RBUTTONDOWN:
+        appInput.mouseRButtonDown = true;
+        break;
+    case WM_LBUTTONUP:
+        appInput.mouseLButtonDown = false;
+        break;
+    case WM_RBUTTONUP:
+        appInput.mouseRButtonDown = false;
     }
+
+    //WASD movement
+    if (m_keyArray['W'])
+    {
+        appInput.horizontalZ = 1.0f;
+    }
+    if (m_keyArray['S'])
+    {
+        appInput.horizontalZ = -1.0f;
+    }
+    if (m_keyArray['A'])
+    {
+        appInput.horizontalX = -1.0f;
+    }
+    if (m_keyArray['D'])
+    {
+        appInput.horizontalX = 1.0f;
+    }
+
+    // Up/Down
+    if (m_keyArray['E'])
+    {
+        appInput.vertical = 1.0f;
+    }
+    if (m_keyArray['Q'])
+    {
+        appInput.vertical = -1.0f;
+    }
+
     return DefWindowProc(hWnd, message, wParam, lParam);
 }
 

@@ -1,6 +1,7 @@
 #include "DX12/SwapChain.h"
 #include "Model.h"
 #include "Camera.h"
+#include "InputCommands.h"
 class WorkGraphsDXR
 {
 public:
@@ -11,7 +12,7 @@ public:
 
 	void Initialize(HWND hwnd, uint32_t width, uint32_t height);
 	void LoadModels();
-	void Update(float dt);
+	void Update(float dt, InputCommands* inputCommands);
 	void Render();
 	void ImGUI();
 
@@ -23,6 +24,7 @@ private:
 
 	std::unique_ptr<Model> m_teapot;
 	std::unique_ptr<Camera> m_camera;
+	InputCommands m_input;
 
 #pragma region WORK_GRAPHS
 	ComPtr<ID3D12RootSignature> m_workGraphRootSignature;
