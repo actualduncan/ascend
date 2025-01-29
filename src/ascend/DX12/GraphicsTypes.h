@@ -1,3 +1,4 @@
+#pragma once
 #include "DX12.h"
 
 //                                          Fence
@@ -20,7 +21,7 @@ class Buffer
 {
 public:
 	Buffer();
-	~Buffer();
+	virtual ~Buffer();
 
 
 	void* Map();
@@ -46,7 +47,7 @@ public:
 	UploadBuffer();
 
 	void Create(const std::wstring& name, size_t BufferSize);
-
+	
 };
 
 //                                      GPU Buffer
@@ -56,7 +57,9 @@ class GpuBuffer : public Buffer
 public:
 	GpuBuffer();
 
-	void Create(const std::wstring& name, uint32_t NumElements, uint32_t ElementSize, const UploadBuffer& srcData, uint32_t srcOffset);
+	void Create(const std::wstring& name, uint32_t NumElements, uint32_t ElementSize, const UploadBuffer& srcData, uint32_t srcOffset = 0);
+	void Create(const std::wstring& name, uint32_t NumElements, uint32_t ElementSize);
+
 	const D3D12_CPU_DESCRIPTOR_HANDLE& GetUAV() const { return m_uav; }
 	const D3D12_CPU_DESCRIPTOR_HANDLE& GetSRV() const { return m_srv; }
 

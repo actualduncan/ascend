@@ -1,5 +1,5 @@
 #include "DX12/SwapChain.h"
-
+#include "Model.h"
 
 class WorkGraphsDXR
 {
@@ -18,8 +18,7 @@ public:
 private:
 	SwapChain m_swapChain;
 
-	typedef UINT16 Index;
-	struct Vertex { float v1, v2, v3; };
+
 	ComPtr<ID3D12Resource> m_indexBuffer;
 	ComPtr<ID3D12Resource> m_vertexBuffer;
 
@@ -49,7 +48,7 @@ private:
 	ComPtr<ID3D12Device5> m_dxrDevice;
 	ComPtr<ID3D12GraphicsCommandList4> m_dxrCommandList;
 	ComPtr<ID3D12Resource> m_accelerationStructure;
-	ComPtr<ID3D12Resource> m_bottomLevelAccelerationStructure;
+	std::vector<ComPtr<ID3D12Resource>> m_bottomLevelAccelerationStructures;
 	ComPtr<ID3D12Resource> m_topLevelAccelerationStructure;
 	void CreateRaytracingInterfaces();
 	void BuildAccelerationStructuresForCompute();
@@ -61,4 +60,7 @@ private:
 
 	ComPtr<ID3D12Resource> scratchResource;
 	ComPtr<ID3D12Resource> instanceDescs;
+	GpuBuffer tlasScratchBuffer;
+	std::vector<GpuBuffer> blasScratchBuffers;
+	Model* bunny;
 };

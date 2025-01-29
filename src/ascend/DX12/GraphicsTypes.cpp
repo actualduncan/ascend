@@ -40,17 +40,22 @@ Buffer::Buffer()
 {
 
 }
+Buffer::~Buffer()
+{
 
+}
 void* Buffer::Map()
 {
     void* Memory;
-    m_resource->Map(0, &CD3DX12_RANGE(0, m_bufferSize), &Memory);
+    CD3DX12_RANGE range(0, m_bufferSize);
+    m_resource->Map(0, &range, &Memory);
     return Memory;
 }
 
-void Buffer::Unmap(size_t begin = 0, size_t end = 0)
+void Buffer::Unmap(size_t begin, size_t end)
 {
-    m_resource->Unmap(0, &CD3DX12_RANGE(begin, min(end, m_bufferSize)));
+    CD3DX12_RANGE range(begin, min(end, m_bufferSize));
+    m_resource->Unmap(0, &range);
 }
 
 //                                      Upload Buffer
@@ -93,7 +98,7 @@ void UploadBuffer::Create(const std::wstring& name, size_t bufferSize)
 //----------------------------------------------------------------------------------------------
 GpuBuffer::GpuBuffer()
 {
-
+    m_resourceFlags = D3D12_RESOURCE_FLAG_NONE;
 }
 
 void GpuBuffer::Create(const std::wstring& name, uint32_t NumElements, uint32_t ElementSize, const UploadBuffer& srcData, uint32_t srcOffset)
@@ -128,5 +133,44 @@ void GpuBuffer::Create(const std::wstring& name, uint32_t NumElements, uint32_t 
     m_gpuVirtualAddress = m_resource->GetGPUVirtualAddress();
 
     m_resource->SetName(name.c_str());
+
+}
+
+void GpuBuffer::Create(const std::wstring& name, uint32_t NumElements, uint32_t ElementSize)
+{
+
+    m_elementCount = NumElements;
+    m_elementSize = ElementSize;
+    m_bufferSize = NumElements * ElementSize;
+
+    D3D12_RESOURCE_DESC resourceDesc = {};
+    resourceDesc.Alignment = 0;
+    resourceDesc.DepthOrArraySize = 1;
+    resourceDesc.Dimension = D3D12_RESOURCE_DIMENSION_BUFFER;
+    resourceDesc.Flags = m_resourceFlags;
+    resourceDesc.Format = DXGI_FORMAT_UNKNOWN;
+    resourceDesc.Height = 1;
+    resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
+    resourceDesc.MipLevels = 1;
+    resourceDesc.SampleDesc.Count = 1;
+    resourceDesc.SampleDesc.Quality = 0;
+    resourceDesc.Width = (UINT64)m_bufferSize;
+    m_usageState = D3D12_RESOURCE_STATE_COMMON;
+
+    D3D12_HEAP_PROPERTIES heapProperties;
+    heapProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
+    heapProperties.CPUPageProperty = D3D12_CPU_PAGE_PROPERTY_UNKNOWN;
+    heapProperties.MemoryPoolPreference = D3D12_MEMORY_POOL_UNKNOWN;
+    heapProperties.CreationNodeMask = 1;
+    heapProperties.VisibleNodeMask = 1;
+
+    VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE,
+        &resourceDesc, m_usageState, nullptr, IID_PPV_ARGS(&m_resource)));
+
+    m_gpuVirtualAddress = m_resource->GetGPUVirtualAddress();
+
+    m_resource->SetName(name.c_str());
+
+
 
 }
