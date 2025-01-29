@@ -10,11 +10,7 @@ float clamp(float n, float lower, float upper)
 }
 
 Camera::Camera(HWND window, float aspectRatio, float minZ, float maxZ)
-	: m_camPosition(0.0f, 3.7f, -3.5f)
-	, m_camRotation(0.0f, 0.0f, 0.0f)
-	, m_camLookAt(0.0f, 0.0f, 1.0f)
-	, m_camRight(0.0f, 0.0f, 0.0f)
-	, m_camRotRate(0.1f)
+	: m_camRotRate(0.1f)
 	, m_movespeed(30.0f)
 	, m_window(window)
 	, m_cursor()
@@ -83,31 +79,33 @@ void Camera::Update(float dt)
 		ShowCursor(true);
 		isMouseActive = false;
 	}
-	
-	Move(XMVECTOR(0.0f/*input.horizontalX*/, 0.0f/*input.vertical*/, 0.0f/*input.horizontalZ*/), dt);
+	XMFLOAT3 direction(0.0f, 0.0f, 0.0f);
+	Move(XMLoadFloat3(&direction), dt);
 
 	CalculateView();
 }
 
 void Camera::CalculateView()
 {
-	XMVECTOR positionv;
-	positionv = XMLoadFloat3(&m_camPosition);
+
+	XMFLOAT3 unitX(1.0f, 0.0f, 0.0f);
+	XMFLOAT3 unitY(0.0f, 1.0f, 0.0f);
+	XMFLOAT3 unitZ(0.0f, 0.0f, 1.0f);
 	float pitch = m_camRotation.x * 0.0174532f;
 	float yaw = m_camRotation.y * 0.0174532f;
 	float roll = m_camRotation.z * 0.0174532f;
 
-	m_camLookAt = XMVECTOR(0.0, 0.0, 1.0f);
+	m_camLookAt = XMLoadFloat3(&unitZ);
 	XMMATRIX rotationMatrix = XMMatrixRotationRollPitchYaw(roll, pitch, yaw);
 
 	m_camLookAt = XMVector3TransformCoord(m_camLookAt, rotationMatrix);
-	m_camLookAt = m_camLookAt + positionv;
+	m_camLookAt = m_camLookAt + m_camPosition;
 
-	m_camUp = XMVector3TransformCoord(XMVECTOR(0.0f, 1.0f, 0.0f), rotationMatrix);
-	m_camRight = XMVector3TransformCoord(XMVECTOR(1.0f, 0.0f, 0.0f), rotationMatrix);
+	m_camUp = XMVector3TransformCoord(XMLoadFloat3(&unitY), rotationMatrix);
+	m_camRight = XMVector3TransformCoord(XMLoadFloat3(&unitX), rotationMatrix);
 	m_forward = XMVector3Cross(m_camUp, -m_camRight);
 
-	m_view = XMMatrixLookAtLH(positionv, m_camLookAt, XMVECTOR(0.0f, 1.0f, 0.0f));
+	m_view = XMMatrixLookAtLH(m_camPosition, m_camLookAt, XMLoadFloat3(&unitY));
 }
 
 void Camera::Rotate(int deltaX, int deltaY, float dt)
@@ -122,10 +120,10 @@ void Camera::Rotate(int deltaX, int deltaY, float dt)
 
 void Camera::Move(XMVECTOR direction, float dt)
 {
-
+	XMFLOAT3 unitY(0.0f, 1.0f, 0.0f);
 	m_camPosition += (m_forward * (direction.m128_f32[2] * m_movespeed)) * dt;
 	m_camPosition += (-m_camRight * (direction.m128_f32[0] * m_movespeed)) * dt;
-	m_camPosition += (XMVECTOR(0.0f, 1.0f, 0.0f) * (direction.m128_f32[1] * m_movespeed)) * dt;
+	m_camPosition += (XMLoadFloat3(&unitY) * (direction.m128_f32[1] * m_movespeed)) * dt;
 }
 
 

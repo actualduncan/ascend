@@ -2,7 +2,7 @@
 
 #include "DX12/PCH.h"
 
-
+using namespace DirectX;
 
 class Camera
 {
@@ -27,7 +27,7 @@ private:
 
 	//camera
 	XMVECTOR		m_camPosition;
-	XMFLOAT3		m_camRotation	;
+	XMFLOAT3		m_camRotation;
 	XMVECTOR		m_camLookAt;
 	XMVECTOR		m_camUp;
 	XMVECTOR		m_camRight;
