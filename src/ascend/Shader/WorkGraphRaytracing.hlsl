@@ -8,6 +8,35 @@
 // PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
 //
 //*********************************************************
+cbuffer RayTraceConstants : register(b0)
+{
+    //XMFLOAT4X4 InvViewProjection;
+    float4x4 InvViewProjection;
+    float4 CameraPosWS;
+    float2 yes[22];
+};
+
+
+
+inline RayDesc GenerateCameraRay(uint2 index, in float3 cameraPosition, in float4x4 projectionToWorld)
+{
+    float2 xy = index + 0.5f; // center in the middle of the pixel.
+    float2 res = float2(1280.0, 800.0);
+    float2 screenPos = xy / res * 2.0 - 1.0;
+
+    // Invert Y for DirectX-style coordinates.
+    screenPos.y = -screenPos.y;
+
+    // Unproject the pixel coordinate into a world positon.
+    float4 world = mul(float4(screenPos, 0, 1), projectionToWorld);
+    world.xyz /= world.w;
+
+    RayDesc ray;
+    ray.Origin = cameraPosition;
+    ray.Direction = normalize(world.xyz - ray.Origin);
+
+    return ray;
+}
 
 RWTexture2D<float4> RenderTarget : register(u0);
 RaytracingAccelerationStructure Scene : register(t0, space0);
@@ -16,18 +45,14 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 [NodeLaunch("broadcasting")]
 [NodeIsProgramEntry]
 [NodeDispatchGrid(1, 1, 1)] // This will be overridden during pipeline creation
-[numthreads(8, 8, 1)]
+[numthreads(1, 1, 1)]
 void EntryFunction(uint3 DTid : SV_DispatchThreadID)
 {
-    float3 dtfloat = float3(DTid.xyz);
-    uint2 pixel = uint2(DTid.x, DTid.y);
     RayDesc ray;
-
+    ray = GenerateCameraRay(DTid.xy, CameraPosWS.xyz, InvViewProjection);
     // need to replace with viewport and width in constant buffer
-    ray.Origin = float3(lerp(-1.0, 1.0, dtfloat.x / 1280.0), lerp(-1.0, 1.0, dtfloat.y / 800.0 ), 0.0);
-    ray.Direction = float3(0, 0, 1);
     ray.TMin = 0.01;
-    ray.TMax = 100000;
+    ray.TMax = 10000;
     
     RayQuery < RAY_FLAG_CULL_NON_OPAQUE |
              RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
@@ -38,11 +63,11 @@ void EntryFunction(uint3 DTid : SV_DispatchThreadID)
     if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
         
-        RenderTarget[pixel] = float4(1.0, 0, 0, 1.0);
+        RenderTarget[DTid.xy] = float4(1.0, 0, 0, 1.0);
     }
     else
-    {
-        RenderTarget[pixel] = float4(0, 0, 0, 1.0);
+    { 
+        RenderTarget[DTid.xy] = float4(0, 0, 0, 1.0);
 
     }
 
