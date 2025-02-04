@@ -2,14 +2,17 @@
 #include "DX12/DX12.h"
 #include "DX12/DX12_Helpers.h"
 #include "Shader/CompiledShaders/WorkGraphRaytracing.hlsl.h"
-
+#include <d3dcompiler.h>
+#include "Shader/CompiledShaders/ComputeRaytracing.hlsl.h"
 // To be moved to DXR namespace
 #pragma region RAY_TRACING
 
 namespace GlobalRootSignatureParams {
+
 	enum Value {
 		OutputViewSlot = 0,
 		AccelerationStructureSlot,
+		ConstantBufferSlot,
 		Count
 	};
 }
@@ -17,6 +20,7 @@ namespace GlobalRootSignatureParams {
 namespace LocalRootSignatureParams {
 	enum Value {
 		ViewportConstantSlot = 0,
+		ConstantBufferSlot,
 		Count
 	};
 }
@@ -41,9 +45,43 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_height = height;
 	DX12::Initialize(D3D_FEATURE_LEVEL_12_2);
 	m_swapChain.Initialize(hwnd, width, height);
+	// Create the constant buffer.
+	{
+		const UINT constantBufferSize = sizeof(RayTraceConstants);    // CB size is required to be 256-byte aligned.
+		auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+		auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(constantBufferSize);
 
-	CreateWorkGraphRootSignature();
-	CreateWorkGraph();
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&uploadHeapProperties,
+			D3D12_HEAP_FLAG_NONE,
+			&bufferDesc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(&m_constantBuffer)));
+		m_constantBuffer->SetName(L"Constant Buffer");
+		// Describe and create a constant buffer view.
+		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+		cbvDesc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress();
+		cbvDesc.SizeInBytes = constantBufferSize;
+		DX12::Device->CreateConstantBufferView(&cbvDesc, DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+
+		// Map and initialize the constant buffer. We don't unmap this until the
+		// app closes. Keeping things mapped for the lifetime of the resource is okay.
+		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
+		VERIFYD3D12RESULT(m_constantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
+		memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+	}
+
+	if (true)
+	{
+		CreateWorkGraphRootSignature();
+		CreateWorkGraph();
+	}
+	else
+	{
+		LoadComputeAssets();
+	}
+
 	DX12::WaitForGPU();
 	CreateRaytracingInterfaces();
 	float aspectRatio = float(width) / float(height);
@@ -59,7 +97,15 @@ void WorkGraphsDXR::LoadModels()
 void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
 {
 	// get this frame's input
+
 	m_input = *inputCommands;
+	m_camera->Update(dt, *inputCommands);
+	XMMATRIX viewProj = m_camera->GetView() * m_camera->GetProjectionMatrix();
+	XMVECTOR det = XMMatrixDeterminant(viewProj);
+	m_constantBufferData.InvViewProjection = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
+	m_constantBufferData.CameraPosWS = XMFLOAT4(m_camera->GetPosition().x, m_camera->GetPosition().y, m_camera->GetPosition().z, 1.0f);
+	memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+
 	// imgui frame
 	// other stuff
 }
@@ -78,8 +124,17 @@ void WorkGraphsDXR::Render()
 		BuildAccelerationStructuresForCompute();
 	}
 
-	DispatchWorkGraph();
-	CopyWorkGraphOutputToBackBuffer();
+	if (true)
+	{
+		DispatchWorkGraph();
+		CopyWorkGraphOutputToBackBuffer();
+	}
+	else
+	{
+		DoCompute();
+		CopyComputeOutputToBackBuffer();
+	}
+
 
 	m_swapChain.EndFrame();
 	DX12::EndFrame(m_swapChain.GetD3DObject());
@@ -104,7 +159,7 @@ void WorkGraphsDXR::CreateWorkGraph()
 	workGraphSubobject->SetProgramName(WorkGraphProgramName);
 
 	auto rootNodeDispatchGrid = workGraphSubobject->CreateBroadcastingLaunchNodeOverrides(L"EntryFunction");
-	rootNodeDispatchGrid->DispatchGrid(ceil(m_width / 8), ceil(m_height / 8), 1);
+	rootNodeDispatchGrid->DispatchGrid(m_width, m_height, 1);
 
 	// create shader library
 	auto lib = stateObjectDesc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
@@ -169,10 +224,10 @@ void WorkGraphsDXR::CreateWorkGraphRootSignature()
 {
 	CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
 	UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-	CD3DX12_ROOT_PARAMETER rootParameters[2];
+	CD3DX12_ROOT_PARAMETER rootParameters[3];
 	rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
 	rootParameters[1].InitAsShaderResourceView(0);
-
+	rootParameters[2].InitAsConstantBufferView(0);
 	ComPtr<ID3DBlob> signature;
 	ComPtr<ID3DBlob> error;
 
@@ -196,6 +251,7 @@ void WorkGraphsDXR::CreateWorkGraphRootSignature()
 		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 		DX12::Device->CreateUnorderedAccessView(m_workGraphOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
 		m_workGraphOutputUavDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+
 	}
 
 }
@@ -207,7 +263,7 @@ void WorkGraphsDXR::DispatchWorkGraph()
 	//DX12::GraphicsCmdList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
 	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_workGraphOutputUavDescriptorHandle);
 	DX12::GraphicsCmdList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
-
+	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_constantBuffer->GetGPUVirtualAddress());
 
 	D3D12_DISPATCH_GRAPH_DESC dispatchDesc = {};
 	dispatchDesc.Mode = D3D12_DISPATCH_MODE_NODE_CPU_INPUT;
@@ -218,7 +274,7 @@ void WorkGraphsDXR::DispatchWorkGraph()
 	// Record does not contain any data
 	dispatchDesc.NodeCPUInput.RecordStrideInBytes = 0;
 	dispatchDesc.NodeCPUInput.pRecords = nullptr;
-
+	
 	// Set program and dispatch the work graphs.
 	// See
 	// https://microsoft.github.io/DirectX-Specs/d3d/WorkGraphs.html#setprogram
@@ -336,9 +392,9 @@ void WorkGraphsDXR::BuildAccelerationStructuresForCompute()
 
 		// Identity matrix
 		ZeroMemory(instanceDesc[i].Transform, sizeof(instanceDesc[i].Transform));
-		instanceDesc[i].Transform[0][0] = 1.0f;
-		instanceDesc[i].Transform[1][1] = 1.0f;
-		instanceDesc[i].Transform[2][2] = 1.0f;
+		instanceDesc[i].Transform[0][0] = 0.1f;
+		instanceDesc[i].Transform[1][1] = 0.1f;
+		instanceDesc[i].Transform[2][2] = 0.1f;
 
 		instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructures[i]->GetGPUVirtualAddress();
 		instanceDesc[i].Flags = 0;
@@ -366,4 +422,82 @@ void WorkGraphsDXR::BuildAccelerationStructuresForCompute()
 	m_dxrCommandList->ResourceBarrier(1, &uavBarrier);
 	m_dxrCommandList->BuildRaytracingAccelerationStructure(&topLevelAccelerationStructureDesc, 0, nullptr);
 	m_shouldBuildAccelerationStructures = false;
+}
+
+void WorkGraphsDXR::LoadComputeAssets()
+{
+	{
+		CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
+		UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+		CD3DX12_ROOT_PARAMETER rootParameters[3];
+		rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
+		rootParameters[1].InitAsShaderResourceView(0);
+		rootParameters[2].InitAsConstantBufferView(0);
+
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC desc(ARRAYSIZE(rootParameters), rootParameters);
+
+		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
+		VERIFYD3D12RESULT(DX12::Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_computeRootSignature)));
+	}
+	// create pso
+	{
+		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+		ComPtr<ID3DBlob> computeShader;
+		ComPtr<ID3DBlob> error;
+		//VERIFYD3D12RESULT(D3DCompileFromFile(L"C:/Users/Duncan/Desktop/_dev/ascend/ascend/build/src/Debug/Shader/ComputeRaytracing.hlsl", nullptr, nullptr, "CSMain", "cs_5_1", compileFlags, 0, &computeShader, &error));
+		D3D12_COMPUTE_PIPELINE_STATE_DESC desc{};
+		desc.pRootSignature = m_computeRootSignature.Get();
+		desc.CS = CD3DX12_SHADER_BYTECODE(CD3DX12_SHADER_BYTECODE((void*)g_pComputeRaytracing, ARRAYSIZE(g_pComputeRaytracing)));
+
+		VERIFYD3D12RESULT(DX12::Device->CreateComputePipelineState(&desc, IID_PPV_ARGS(&m_computePipelineState)));
+		NAME_D3D12_OBJECT(m_computePipelineState);
+	}
+
+
+
+	{
+		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_computeOutput)));
+
+
+		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 0, DX12::UAVDescriptorSize);
+		//m_raytracingOutputResourceUAVDescriptorHeapIndex = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, descriptorIndexToUse, m_computeDescriptorSize);
+		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
+		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		DX12::Device->CreateUnorderedAccessView(m_computeOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
+		m_computeOutputUavDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+
+	}
+}
+
+void WorkGraphsDXR::DoCompute()
+{
+	DX12::GraphicsCmdList->SetPipelineState(m_computePipelineState.Get());
+	//D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
+	DX12::GraphicsCmdList->SetDescriptorHeaps(1, DX12::UAVDescriptorHeap.GetAddressOf());
+	DX12::GraphicsCmdList->SetComputeRootSignature(m_computeRootSignature.Get());
+	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_computeOutputUavDescriptorHandle);
+	DX12::GraphicsCmdList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
+	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_constantBuffer->GetGPUVirtualAddress());
+	DX12::GraphicsCmdList->Dispatch(m_width, m_height, 1);
+
+}
+
+void WorkGraphsDXR::CopyComputeOutputToBackBuffer()
+{
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+
+	DX12::GraphicsCmdList->CopyResource(m_swapChain.BackBuffer(), m_computeOutput.Get());
+
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
+
+
 }

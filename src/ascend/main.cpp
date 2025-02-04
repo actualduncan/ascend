@@ -13,7 +13,37 @@ InputCommands appInput;
 char m_keyArray[256];
 
 bool CreateWindowsApplication(int wHeight, int wWidth, HINSTANCE hInstance, int nCmdShow);
+#include <filesystem>
+#include <shlobj.h>
 
+static std::wstring GetLatestWinPixGpuCapturerPath_Cpp17()
+{
+    LPWSTR programFilesPath = nullptr;
+    SHGetKnownFolderPath(FOLDERID_ProgramFiles, KF_FLAG_DEFAULT, NULL, &programFilesPath);
+
+    std::filesystem::path pixInstallationPath = programFilesPath;
+    pixInstallationPath /= "Microsoft PIX";
+
+    std::wstring newestVersionFound;
+
+    for (auto const& directory_entry : std::filesystem::directory_iterator(pixInstallationPath))
+    {
+        if (directory_entry.is_directory())
+        {
+            if (newestVersionFound.empty() || newestVersionFound < directory_entry.path().filename().c_str())
+            {
+                newestVersionFound = directory_entry.path().filename().c_str();
+            }
+        }
+    }
+
+    if (newestVersionFound.empty())
+    {
+        // TODO: Error, no PIX installation found
+    }
+
+    return pixInstallationPath / newestVersionFound / L"WinPixGpuCapturer.dll";
+}
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 {
     if(CreateWindowsApplication(1280, 800, hInstance, nCmdShow))
@@ -27,6 +57,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
         //io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
 
         //ImGui_ImplWin32_Init(hwnd);
+        // Check to see if a copy of WinPixGpuCapturer.dll has already been injected into the application.
+// This may happen if the application is launched through the PIX UI. 
+        if (GetModuleHandle(L"WinPixGpuCapturer.dll") == 0)
+        {
+            LoadLibrary(GetLatestWinPixGpuCapturerPath_Cpp17().c_str());
+        }
+
         WorkGraphsDXR_app = new WorkGraphsDXR();
         WorkGraphsDXR_app->Initialize(hwnd, 1280, 800);
 
@@ -60,7 +97,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE, LPSTR, int nCmdShow)
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 LRESULT CALLBACK WindowProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
-
+    appInput.Reset();
     if (ImGui_ImplWin32_WndProcHandler(hWnd, message, wParam, lParam))
         return true;
 

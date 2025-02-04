@@ -8,7 +8,7 @@
 // PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
 //
 //*********************************************************
-
+/*
 #ifndef RAYTRACING_HLSL
 #define RAYTRACING_HLSL
 
@@ -81,3 +81,4 @@ void MyMissShader(inout RayPayload payload)
 }
 
 #endif // RAYTRACING_HLSL
+*/
