@@ -1,22 +1,9 @@
-//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
 cbuffer RayTraceConstants : register(b0)
 {
-    //XMFLOAT4X4 InvViewProjection;
     float4x4 InvViewProjection;
     float4 CameraPosWS;
     float2 yes[22];
 };
-
-
 
 inline RayDesc GenerateCameraRay(uint2 index, in float3 cameraPosition, in float4x4 projectionToWorld)
 {
@@ -37,9 +24,6 @@ inline RayDesc GenerateCameraRay(uint2 index, in float3 cameraPosition, in float
 
     return ray;
 }
-
-#ifndef COMPUTERAYTRACING_HLSL
-#define COMPUTERAYTRACING_HLSL
 
 RWTexture2D<float4> RenderTarget : register(u0);
 RaytracingAccelerationStructure Scene : register(t0, space0);
@@ -72,5 +56,3 @@ void CSMain(uint3 DTid : SV_DispatchThreadID)
 
     GroupMemoryBarrierWithGroupSync();
 }
-
-#endif // COMPUTERAYTRACING_HLSL
