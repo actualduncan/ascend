@@ -16,11 +16,11 @@ Camera::Camera(HWND window, float aspectRatio, float minZ, float maxZ)
 	, m_cursor()
 {
 
-	m_position = XMFLOAT3(0.0f,0.0f, 1.0f);
-	m_rotation = XMFLOAT3(0,0,0);
-	m_up = XMFLOAT3(0, 0, 0);
-	m_right = XMFLOAT3(0, 0, 0);
-	m_forward = XMFLOAT3(0, 0, 0);
+	m_position = XMFLOAT3(0.0f, 3.5f, -10.0f);
+	m_rotation = XMFLOAT3(0,-180.0f,0);
+	m_up = XMFLOAT3(0, 1.0f, 0);
+	m_right = XMFLOAT3(1.0f, 0, 0);
+	m_forward = XMFLOAT3(0, 0, 1.0f);
 	m_projectionMatrix = XMMatrixIdentity();
 
 	WindowSizeChanged(aspectRatio, minZ, maxZ);

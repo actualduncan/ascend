@@ -13,12 +13,16 @@ struct Vertex { float v1, v2, v3; };
 
 struct Mesh
 {
-	D3D12_VERTEX_BUFFER_VIEW m_vertexBufferView;
-	D3D12_INDEX_BUFFER_VIEW m_indexBufferView;
+	D3D12_VERTEX_BUFFER_VIEW GetVertexBufferView();
+	D3D12_INDEX_BUFFER_VIEW GetIndexBufferView();
+
 	uint32_t numVertices;
 	uint32_t numIndices;
 	uint32_t vertexOffset;
 	uint32_t indexOffset;
+
+	D3D12_GPU_VIRTUAL_ADDRESS vertexBufferAddress;
+	D3D12_GPU_VIRTUAL_ADDRESS indexBufferAddress;
 };
 
 class Model
@@ -27,7 +31,7 @@ public:
     Model(const std::string& file);
     ~Model();
 
-	const std::vector<Mesh>& GetModelMeshVector() { return m_modelMeshes; };
+	std::vector<Mesh>& GetModelMeshVector() { return m_modelMeshes; };
 	D3D12_VERTEX_BUFFER_VIEW GetVertexBuffer();
 	D3D12_INDEX_BUFFER_VIEW GetIndexBuffer();
 private:

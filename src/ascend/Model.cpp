@@ -2,6 +2,26 @@
 #include "DX12/DX12.h"
 #include "DX12/DX12_Helpers.h"
 
+D3D12_VERTEX_BUFFER_VIEW Mesh::GetVertexBufferView()
+{
+	D3D12_VERTEX_BUFFER_VIEW vbView = {};
+
+	vbView.BufferLocation = vertexBufferAddress;
+	vbView.SizeInBytes = numVertices * sizeof(Vertex);
+	vbView.StrideInBytes = sizeof(Vertex);
+	return vbView;
+}
+
+D3D12_INDEX_BUFFER_VIEW Mesh::GetIndexBufferView()
+{
+	D3D12_INDEX_BUFFER_VIEW ibView = {};
+
+	ibView.BufferLocation = indexBufferAddress;
+	ibView.SizeInBytes = numIndices * sizeof(Index);
+	ibView.Format = DXGI_FORMAT_R16_UINT;
+	return ibView;
+}
+
 Model::Model(const std::string& file)
 {
 	ImportModel(file);
@@ -66,6 +86,7 @@ void Model::CreateBuffers()
 
 	for (auto it = m_modelMeshes.begin(); it < m_modelMeshes.end(); ++it)
 	{
+
 		it->vertexOffset = vertexBufferSize;
 		it->indexOffset = indexBufferSize;
 
@@ -76,6 +97,11 @@ void Model::CreateBuffers()
 	AllocateUploadBuffer(DX12::Device.Get(), vertices, vertexBufferSize, &m_vertexBuffer);
 	AllocateUploadBuffer(DX12::Device.Get(), indices, indexBufferSize, &m_indexBuffer);
 
+	for (auto it = m_modelMeshes.begin(); it < m_modelMeshes.end(); ++it)
+	{
+		it->indexBufferAddress = m_indexBuffer->GetGPUVirtualAddress() + it->indexOffset;
+		it->vertexBufferAddress = m_vertexBuffer->GetGPUVirtualAddress() + it->vertexOffset;
+	}
 }
 
 void Model::InitFromAssimpMesh(const aiMesh& assimpMesh, Vertex* dstVertices, Index* dstIndices)
@@ -103,6 +129,7 @@ void Model::InitFromAssimpMesh(const aiMesh& assimpMesh, Vertex* dstVertices, In
 		dstIndices[triIdx * 3 + 1] = UINT16(assimpMesh.mFaces[triIdx].mIndices[1]);
 		dstIndices[triIdx * 3 + 2] = UINT16(assimpMesh.mFaces[triIdx].mIndices[2]);
 	}
+
 
 	m_modelMeshes.push_back(mesh);
 }

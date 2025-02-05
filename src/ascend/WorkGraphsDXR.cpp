@@ -108,7 +108,7 @@ void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
 	m_camera->Update(dt, *inputCommands);
 	XMMATRIX viewProj = m_camera->GetView() * m_camera->GetProjectionMatrix();
 	XMVECTOR det = XMMatrixDeterminant(viewProj);
-	m_constantBufferData.InvViewProjection = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
+	m_constantBufferData.InvViewProjection = XMMatrixTranspose(viewProj);//XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
 	m_constantBufferData.CameraPosWS = XMFLOAT4(m_camera->GetPosition().x, m_camera->GetPosition().y, m_camera->GetPosition().z, 1.0f);
 	memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
 
@@ -127,7 +127,7 @@ void WorkGraphsDXR::Render()
 
 	if (m_shouldBuildAccelerationStructures)
 	{
-		BuildAccelerationStructuresForCompute();
+		//BuildAccelerationStructuresForCompute();
 	}
 
 	if (true)
@@ -260,7 +260,6 @@ void WorkGraphsDXR::CreateWorkGraphRootSignature()
 		m_workGraphOutputUavDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 
 	}
-
 }
 
 void WorkGraphsDXR::DispatchWorkGraph()
@@ -399,16 +398,15 @@ void WorkGraphsDXR::BuildAccelerationStructuresForCompute()
 
 		// Identity matrix
 		ZeroMemory(instanceDesc[i].Transform, sizeof(instanceDesc[i].Transform));
-		instanceDesc[i].Transform[0][0] = 0.1f;
-		instanceDesc[i].Transform[1][1] = 0.1f;
-		instanceDesc[i].Transform[2][2] = 0.1f;
+		instanceDesc[i].Transform[0][0] = 1.0f;
+		instanceDesc[i].Transform[1][1] = 1.0f;
+		instanceDesc[i].Transform[2][2] = 1.0f;
 
 		instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructures[i]->GetGPUVirtualAddress();
 		instanceDesc[i].Flags = 0;
 		instanceDesc[i].InstanceID = 0;
 		instanceDesc[i].InstanceMask = 1;
 		instanceDesc[i].InstanceContributionToHitGroupIndex = i;
-
 	}
 
 	AllocateUploadBuffer(DX12::Device.Get(), instanceDesc.data(), instanceDesc.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC), &instanceDescs, L"InstanceDescs");
@@ -493,7 +491,6 @@ void WorkGraphsDXR::DoCompute()
 	DX12::GraphicsCmdList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
 	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_constantBuffer->GetGPUVirtualAddress());
 	DX12::GraphicsCmdList->Dispatch(m_width, m_height, 1);
-
 }
 
 void WorkGraphsDXR::CopyComputeOutputToBackBuffer()
@@ -505,21 +502,21 @@ void WorkGraphsDXR::CopyComputeOutputToBackBuffer()
 
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
-
-
 }
 
 void WorkGraphsDXR::LoadRasterAssets()
 {
-	// root sig
 	 // Create the root signature.
 	{
-		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
-		rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		
+		CD3DX12_ROOT_PARAMETER rootParameters[1];
+		rootParameters[0].InitAsConstantBufferView(0);
 
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
-		VERIFYD3D12RESULT(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
+
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
 		VERIFYD3D12RESULT(DX12::Device ->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rasterRootSignature)));
 	}
 
@@ -557,12 +554,12 @@ void WorkGraphsDXR::LoadRasterAssets()
 		psoDesc.SampleDesc.Count = 1;
 		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_rasterPipelineState)));
 	}
-
 }
 void WorkGraphsDXR::DoRaster()
 {
 	DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
 	DX12::GraphicsCmdList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
+	DX12::GraphicsCmdList->SetGraphicsRootConstantBufferView(0, m_constantBuffer->GetGPUVirtualAddress());
 	DX12::GraphicsCmdList->RSSetViewports(1, &m_viewport);
 	DX12::GraphicsCmdList->RSSetScissorRects(1, &m_scissorRect);
 
@@ -573,8 +570,19 @@ void WorkGraphsDXR::DoRaster()
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
-	DX12::GraphicsCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	D3D12_VERTEX_BUFFER_VIEW bview = m_teapot->GetVertexBuffer();
-	DX12::GraphicsCmdList->IASetVertexBuffers(0, 1, &bview);
-	DX12::GraphicsCmdList->DrawInstanced(3, 1, 0, 0);
+
+	const uint64_t modelMeshCount = m_teapot->GetModelMeshVector().size();
+	for (int i = 0; i < modelMeshCount; ++i)
+	{
+		auto mesh = m_teapot->GetModelMeshVector()[i];
+
+		D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
+		D3D12_INDEX_BUFFER_VIEW ibView = mesh.GetIndexBufferView();
+
+		DX12::GraphicsCmdList->IASetVertexBuffers(0, 1, &vbView);
+		DX12::GraphicsCmdList->IASetIndexBuffer(&ibView);
+		DX12::GraphicsCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+		DX12::GraphicsCmdList->DrawIndexedInstanced(mesh.numIndices, 1, 0, 0, 0);
+	}
 }
