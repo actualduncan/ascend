@@ -56,3 +56,16 @@ function(nuget_get_WinPixEventRuntime IN_TARGET OUT_SUCCEEDED OUT_INCLUDE_PATH O
 
     return(PROPAGATE ${OUT_SUCCEEDED} ${OUT_INCLUDE_PATH} ${OUT_BINARY_PATH})
 endfunction()
+
+function(nuget_get_assimp IN_TARGET OUT_SUCCEEDED OUT_INCLUDE_PATH OUT_BINARY_PATH OUT_LIB_PATH)
+
+    nuget_pkg_get(${IN_TARGET} "AssimpCpp" "5.0.1.6" ${OUT_SUCCEEDED} PKG_PATH)
+
+    if (${${OUT_SUCCEEDED}})
+        set(${OUT_INCLUDE_PATH} "${PKG_PATH}/build/native/include")
+        set(${OUT_BINARY_PATH} "${PKG_PATH}/build/native/bin/Debug")
+        set(${OUT_LIB_PATH} "${PKG_PATH}/build/native/lib/Debug")
+    endif()
+
+    return(PROPAGATE ${OUT_SUCCEEDED} ${OUT_INCLUDE_PATH} ${OUT_BINARY_PATH} ${OUT_LIB_PATH})
+endfunction()

@@ -1,5 +1,6 @@
 #include "GraphicsTypes.h"
 #include "DX12_Helpers.h"
+#include <algorithm>
 
 //                                          Fence
 //----------------------------------------------------------------------------------------------
@@ -54,7 +55,7 @@ void* Buffer::Map()
 
 void Buffer::Unmap(size_t begin, size_t end)
 {
-    CD3DX12_RANGE range(begin, min(end, m_bufferSize));
+    CD3DX12_RANGE range(begin, std::min(end, m_bufferSize));
     m_resource->Unmap(0, &range);
 }
 
