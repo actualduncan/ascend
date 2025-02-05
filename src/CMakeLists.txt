@@ -70,6 +70,7 @@ set(HLSL_LIB_SHADER_FILES ascend/Shader/Raytracing.hlsl ascend/Shader/WorkGraphR
 set(HLSL_CS_SHADER_FILES  ascend/Shader/ComputeRaytracing.hlsl)
 set(SHADER_FILES ${HLSL_LIB_SHADER_FILES} 					  
 				 ${HLSL_CS_SHADER_FILES}
+				 ascend/Shader/Raster.hlsl
 				 ascend/Shader/HlslCompat.h
 				 ascend/Shader/RaytracingHlslCompat.h)  
 set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ascend/Shader)
