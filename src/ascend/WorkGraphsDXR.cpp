@@ -4,6 +4,8 @@
 #include "Shader/CompiledShaders/WorkGraphRaytracing.hlsl.h"
 #include <d3dcompiler.h>
 #include "Shader/CompiledShaders/ComputeRaytracing.hlsl.h"
+#include "Shader/CompiledShaders/RasterPS.hlsl.h"
+#include "Shader/CompiledShaders/RasterVS.hlsl.h"
 // To be moved to DXR namespace
 #pragma region RAY_TRACING
 
@@ -45,6 +47,9 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_height = height;
 	DX12::Initialize(D3D_FEATURE_LEVEL_12_2);
 	m_swapChain.Initialize(hwnd, width, height);
+	m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height));
+	m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height));
+
 	// Create the constant buffer.
 	{
 		const UINT constantBufferSize = sizeof(RayTraceConstants);    // CB size is required to be 256-byte aligned.
@@ -74,8 +79,9 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 
 	if (true)
 	{
-		CreateWorkGraphRootSignature();
-		CreateWorkGraph();
+		LoadRasterAssets();
+		//CreateWorkGraphRootSignature();
+		//CreateWorkGraph();
 	}
 	else
 	{
@@ -126,8 +132,9 @@ void WorkGraphsDXR::Render()
 
 	if (true)
 	{
-		DispatchWorkGraph();
-		CopyWorkGraphOutputToBackBuffer();
+		DoRaster();
+		//DispatchWorkGraph();
+		//CopyWorkGraphOutputToBackBuffer();
 	}
 	else
 	{
@@ -500,4 +507,74 @@ void WorkGraphsDXR::CopyComputeOutputToBackBuffer()
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
 
 
+}
+
+void WorkGraphsDXR::LoadRasterAssets()
+{
+	// root sig
+	 // Create the root signature.
+	{
+		CD3DX12_ROOT_SIGNATURE_DESC rootSignatureDesc;
+		rootSignatureDesc.Init(0, nullptr, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+		VERIFYD3D12RESULT(D3D12SerializeRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1, &signature, &error));
+		VERIFYD3D12RESULT(DX12::Device ->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rasterRootSignature)));
+	}
+
+	// Create the pipeline state, which includes compiling and loading shaders.
+	{
+		ComPtr<ID3DBlob> vertexShader;
+		ComPtr<ID3DBlob> pixelShader;
+
+#if defined(_DEBUG)
+		// Enable better shader debugging with the graphics debugging tools.
+		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
+#else
+		UINT compileFlags = 0;
+#endif
+		// Define the vertex input layout.
+		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
+		{
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+		};
+
+		// Describe and create the graphics pipeline state object (PSO).
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+		psoDesc.pRootSignature = m_rasterRootSignature.Get();
+		psoDesc.VS = CD3DX12_SHADER_BYTECODE((void*)g_pRasterVS, ARRAYSIZE(g_pRasterVS));
+		psoDesc.PS = CD3DX12_SHADER_BYTECODE((void*)g_pRasterPS, ARRAYSIZE(g_pRasterPS));
+		psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		psoDesc.DepthStencilState.DepthEnable = FALSE;
+		psoDesc.DepthStencilState.StencilEnable = FALSE;
+		psoDesc.SampleMask = UINT_MAX;
+		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		psoDesc.NumRenderTargets = 1;
+		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		psoDesc.SampleDesc.Count = 1;
+		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_rasterPipelineState)));
+	}
+
+}
+void WorkGraphsDXR::DoRaster()
+{
+	DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
+	DX12::GraphicsCmdList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
+	DX12::GraphicsCmdList->RSSetViewports(1, &m_viewport);
+	DX12::GraphicsCmdList->RSSetScissorRects(1, &m_scissorRect);
+
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(DX12::RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), m_swapChain.GetD3DObject()->GetCurrentBackBufferIndex(), DX12::RTVDescriptorSize);
+	DX12::GraphicsCmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, nullptr);
+
+	// Record commands.
+	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	DX12::GraphicsCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	D3D12_VERTEX_BUFFER_VIEW bview = m_teapot->GetVertexBuffer();
+	DX12::GraphicsCmdList->IASetVertexBuffers(0, 1, &bview);
+	DX12::GraphicsCmdList->DrawInstanced(3, 1, 0, 0);
 }

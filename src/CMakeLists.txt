@@ -68,10 +68,12 @@ set(SOURCES ascend/main.cpp
 # TODO: Move to .cmake file for shader compiling - Reduce code duplication.
 set(HLSL_LIB_SHADER_FILES ascend/Shader/WorkGraphRaytracing.hlsl)
 set(HLSL_CS_SHADER_FILES  ascend/Shader/ComputeRaytracing.hlsl)
-
+set(HLSL_VS_SHADER_FILES ascend/Shader/RasterVS.hlsl)
+set(HLSL_PS_SHADER_FILES ascend/Shader/RasterPS.hlsl)
 set(SHADER_FILES ${HLSL_LIB_SHADER_FILES} 					  
 				 ${HLSL_CS_SHADER_FILES}
-				 ascend/Shader/Raster.hlsl)  
+				 ${HLSL_VS_SHADER_FILES}
+				 ${HLSL_PS_SHADER_FILES})  
 				 
 set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ascend/Shader)
 
@@ -85,6 +87,17 @@ set_source_files_properties(${HLSL_CS_SHADER_FILES} PROPERTIES VS_SHADER_TYPE cs
 set_source_files_properties(${HLSL_CS_SHADER_FILES} PROPERTIES VS_SHADER_MODEL 6_5)
 set_source_files_properties(${HLSL_CS_SHADER_FILES} PROPERTIES VS_SHADER_VARIABLE_NAME "g_p%(Filename)")
 set_source_files_properties(${HLSL_CS_SHADER_FILES} PROPERTIES VS_SHADER_OUTPUT_HEADER_FILE "$(IntDir)CompiledShaders\%(Filename).hlsl.h")
+
+set_source_files_properties(${HLSL_VS_SHADER_FILES} PROPERTIES VS_SHADER_TYPE vs)
+set_source_files_properties(${HLSL_VS_SHADER_FILES} PROPERTIES VS_SHADER_MODEL 6_5)
+set_source_files_properties(${HLSL_VS_SHADER_FILES} PROPERTIES VS_SHADER_VARIABLE_NAME "g_p%(Filename)")
+set_source_files_properties(${HLSL_VS_SHADER_FILES} PROPERTIES VS_SHADER_OUTPUT_HEADER_FILE "$(IntDir)CompiledShaders\%(Filename).hlsl.h")
+
+set_source_files_properties(${HLSL_PS_SHADER_FILES} PROPERTIES VS_SHADER_TYPE ps)
+set_source_files_properties(${HLSL_PS_SHADER_FILES} PROPERTIES VS_SHADER_MODEL 6_5)
+set_source_files_properties(${HLSL_PS_SHADER_FILES} PROPERTIES VS_SHADER_VARIABLE_NAME "g_p%(Filename)")
+set_source_files_properties(${HLSL_PS_SHADER_FILES} PROPERTIES VS_SHADER_OUTPUT_HEADER_FILE "$(IntDir)CompiledShaders\%(Filename).hlsl.h")
+
 
 set(SHADER_SOURCE_REL_DIR "Shaders")
 
@@ -115,6 +128,27 @@ foreach(FILE ${HLSL_CS_SHADER_FILES})
                      VERBATIM)		
 endforeach(FILE)
 
+foreach(FILE ${HLSL_VS_SHADER_FILES})
+  get_filename_component(FILE_WE ${FILE} NAME_WE)
+  list(APPEND CSO_SHADER_FILES ${CMAKE_BINARY_DIR}/${FILE_WE}.cso)
+	add_custom_command(TARGET CompileShaders
+		COMMAND "${DXC_DLL}/dxc.exe" /E VSMain /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T vs_6_8 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
+		             MAIN_DEPENDENCY ${FILE}
+                     COMMENT "HLSL ${FILE}"
+                     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                     VERBATIM)		
+endforeach(FILE)
+
+foreach(FILE ${HLSL_PS_SHADER_FILES})
+  get_filename_component(FILE_WE ${FILE} NAME_WE)
+  list(APPEND CSO_SHADER_FILES ${CMAKE_BINARY_DIR}/${FILE_WE}.cso)
+	add_custom_command(TARGET CompileShaders
+		COMMAND "${DXC_DLL}/dxc.exe" /E PSMain /Zi /Od /Vn g_p${FILE_WE} /Fo ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.cso /T ps_6_8 /Fh ${SHADER_SOURCE_DIR}/CompiledShaders/${FILE_WE}.hlsl.h /nologo ${FILE}
+		             MAIN_DEPENDENCY ${FILE}
+                     COMMENT "HLSL ${FILE}"
+                     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+                     VERBATIM)		
+endforeach(FILE)
 add_dependencies(ascend CompileShaders)
 
 file(GLOB_RECURSE AGILITY_HEADERS "${AGILITY_INCLUDE}/*.h*" )

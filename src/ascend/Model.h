@@ -28,8 +28,8 @@ public:
     ~Model();
 
 	const std::vector<Mesh>& GetModelMeshVector() { return m_modelMeshes; };
-	 D3D12_VERTEX_BUFFER_VIEW GetVertexBuffer();
-	 D3D12_INDEX_BUFFER_VIEW GetIndexBuffer();
+	D3D12_VERTEX_BUFFER_VIEW GetVertexBuffer();
+	D3D12_INDEX_BUFFER_VIEW GetIndexBuffer();
 private:
 	void ImportModel(const std::string& pFile);
 	void InitFromAssimpMesh(const aiMesh& assimpMesh, Vertex* dstVertices, Index* dstIndices);
