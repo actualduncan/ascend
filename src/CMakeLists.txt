@@ -66,13 +66,13 @@ set(SOURCES ascend/main.cpp
 )
 
 # TODO: Move to .cmake file for shader compiling - Reduce code duplication.
-set(HLSL_LIB_SHADER_FILES ascend/Shader/Raytracing.hlsl ascend/Shader/WorkGraphRaytracing.hlsl)
+set(HLSL_LIB_SHADER_FILES ascend/Shader/WorkGraphRaytracing.hlsl)
 set(HLSL_CS_SHADER_FILES  ascend/Shader/ComputeRaytracing.hlsl)
+
 set(SHADER_FILES ${HLSL_LIB_SHADER_FILES} 					  
 				 ${HLSL_CS_SHADER_FILES}
-				 ascend/Shader/Raster.hlsl
-				 ascend/Shader/HlslCompat.h
-				 ascend/Shader/RaytracingHlslCompat.h)  
+				 ascend/Shader/Raster.hlsl)  
+				 
 set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ascend/Shader)
 
 set_source_files_properties(${HLSL_LIB_SHADER_FILES} PROPERTIES VS_SHADER_TYPE lib)
