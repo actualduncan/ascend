@@ -32,7 +32,7 @@ private:
 	ComPtr<ID3D12Resource> m_constantBuffer;
 	UINT8* m_pCbvDataBegin = nullptr;
 
-	std::unique_ptr<Model> m_teapot;
+	std::unique_ptr<Model> m_sponza;
 	std::unique_ptr<Camera> m_camera;
 	InputCommands m_input;
 

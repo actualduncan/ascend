@@ -97,7 +97,7 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 
 void WorkGraphsDXR::LoadModels()
 {
-	m_teapot = std::make_unique<Model>("debug/Shader/teapot.obj");
+	m_sponza = std::make_unique<Model>("debug/res/sponza.obj");
 }
 
 void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
@@ -314,19 +314,19 @@ void WorkGraphsDXR::CreateRaytracingInterfaces()
 
 void WorkGraphsDXR::BuildAccelerationStructuresForCompute()
 {
-	const uint64_t modelMeshCount = m_teapot->GetModelMeshVector().size();
+	const uint64_t modelMeshCount = m_sponza->GetModelMeshVector().size();
 	std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescs(modelMeshCount);
 	for (int i = 0; i < modelMeshCount; ++i)
 	{
 		geometryDescs[i].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 		geometryDescs[i].Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-		geometryDescs[i].Triangles.VertexCount = m_teapot->GetModelMeshVector()[i].numVertices;;
-		geometryDescs[i].Triangles.VertexBuffer.StartAddress = m_teapot->GetVertexBuffer().BufferLocation + m_teapot->GetModelMeshVector()[i].vertexOffset;
-		geometryDescs[i].Triangles.VertexBuffer.StrideInBytes = m_teapot->GetVertexBuffer().StrideInBytes;
+		geometryDescs[i].Triangles.VertexCount = m_sponza->GetModelMeshVector()[i].numVertices;;
+		geometryDescs[i].Triangles.VertexBuffer.StartAddress = m_sponza->GetVertexBuffer().BufferLocation + m_sponza->GetModelMeshVector()[i].vertexOffset;
+		geometryDescs[i].Triangles.VertexBuffer.StrideInBytes = m_sponza->GetVertexBuffer().StrideInBytes;
 		geometryDescs[i].Triangles.Transform3x4 = 0;
-		geometryDescs[i].Triangles.IndexBuffer = m_teapot->GetIndexBuffer().BufferLocation + m_teapot->GetModelMeshVector()[i].indexOffset;
-		geometryDescs[i].Triangles.IndexCount = m_teapot->GetModelMeshVector()[i].numIndices;
-		geometryDescs[i].Triangles.IndexFormat = m_teapot->GetIndexBuffer().Format;
+		geometryDescs[i].Triangles.IndexBuffer = m_sponza->GetIndexBuffer().BufferLocation + m_sponza->GetModelMeshVector()[i].indexOffset;
+		geometryDescs[i].Triangles.IndexCount = m_sponza->GetModelMeshVector()[i].numIndices;
+		geometryDescs[i].Triangles.IndexFormat = m_sponza->GetIndexBuffer().Format;
 
 		geometryDescs[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 	}
@@ -571,10 +571,10 @@ void WorkGraphsDXR::DoRaster()
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
 
-	const uint64_t modelMeshCount = m_teapot->GetModelMeshVector().size();
+	const uint64_t modelMeshCount = m_sponza->GetModelMeshVector().size();
 	for (int i = 0; i < modelMeshCount; ++i)
 	{
-		auto mesh = m_teapot->GetModelMeshVector()[i];
+		auto mesh = m_sponza->GetModelMeshVector()[i];
 
 		D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
 		D3D12_INDEX_BUFFER_VIEW ibView = mesh.GetIndexBufferView();
