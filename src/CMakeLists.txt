@@ -47,6 +47,8 @@ set(SOURCES ascend/main.cpp
 			ascend/DX12/SwapChain.h
 			ascend/DX12/SwapChain.cpp
 			ascend/DX12/PCH.h
+			ascend/DX12/DDSTextureLoader12.cpp
+			ascend/DX12/DDSTextureLoader12.h
 			ascend/imgui/imconfig.h
 			ascend/imgui/imgui.cpp
 			ascend/imgui/imgui.h
@@ -149,6 +151,7 @@ foreach(FILE ${HLSL_PS_SHADER_FILES})
                      WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
                      VERBATIM)		
 endforeach(FILE)
+
 add_dependencies(ascend CompileShaders)
 
 file(GLOB_RECURSE AGILITY_HEADERS "${AGILITY_INCLUDE}/*.h*" )
