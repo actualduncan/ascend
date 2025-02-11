@@ -113,11 +113,18 @@ void Model::InitFromAssimpMesh(const aiMesh& assimpMesh, Vertex* dstVertices, In
 
 	for (uint64_t i = 0; i < mesh.numVertices; ++i)
 	{
-		Vertex vert(0.0f, 0.0f, 0.0f);
+		Vertex vert;
 
-		vert.v1 = assimpMesh.mVertices[i].x;
-		vert.v2 = assimpMesh.mVertices[i].y;
-		vert.v3 = assimpMesh.mVertices[i].z;
+		vert.Position.x = assimpMesh.mVertices[i].x;
+		vert.Position.y = assimpMesh.mVertices[i].y;
+		vert.Position.z = assimpMesh.mVertices[i].z;
+
+		vert.Normal.x = assimpMesh.mNormals[i].x;
+		vert.Normal.y = assimpMesh.mNormals[i].y;
+		vert.Normal.z = assimpMesh.mNormals[i].z;
+
+		vert.TexC.x = assimpMesh.mTextureCoords[0][i].x;
+		vert.TexC.y = assimpMesh.mTextureCoords[0][i].y;
 
 		dstVertices[i] = vert;
 	}

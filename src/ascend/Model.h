@@ -9,7 +9,11 @@
 using namespace DirectX;
 
 typedef UINT16 Index;
-struct Vertex { float v1, v2, v3; };
+struct Vertex { 
+	XMFLOAT3 Position;
+	XMFLOAT3 Normal;
+	XMFLOAT2 TexC;
+};
 
 struct Mesh
 {

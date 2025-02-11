@@ -29,7 +29,7 @@
 #include <directx/d3d12.h>
 #include <dxguids/dxguids.h>
 #else
-#include <d3d12.h>
+#include <d3dx12/d3dx12.h>
 #pragma comment(lib,"dxguid.lib")
 #endif
 
