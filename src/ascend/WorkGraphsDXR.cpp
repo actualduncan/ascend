@@ -1,8 +1,9 @@
 #include "WorkGraphsDXR.h"
 #include "DX12/DX12.h"
 #include "DX12/DX12_Helpers.h"
-#include "Shader/CompiledShaders/WorkGraphRaytracing.hlsl.h"
+#include "DX12/DDSTextureLoader12.h"
 #include <d3dcompiler.h>
+#include "Shader/CompiledShaders/WorkGraphRaytracing.hlsl.h"
 #include "Shader/CompiledShaders/ComputeRaytracing.hlsl.h"
 #include "Shader/CompiledShaders/RasterPS.hlsl.h"
 #include "Shader/CompiledShaders/RasterVS.hlsl.h"
@@ -69,7 +70,7 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 		cbvDesc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress();
 		cbvDesc.SizeInBytes = constantBufferSize;
 		DX12::Device->CreateConstantBufferView(&cbvDesc, DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-
+		
 		// Map and initialize the constant buffer. We don't unmap this until the
 		// app closes. Keeping things mapped for the lifetime of the resource is okay.
 		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
@@ -94,10 +95,54 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_camera = std::make_unique<Camera>(hwnd, aspectRatio);
 	LoadModels();
 }
-
+std::unique_ptr<Texture> lion = nullptr;
+D3D12_GPU_DESCRIPTOR_HANDLE texhandle;
 void WorkGraphsDXR::LoadModels()
 {
 	m_sponza = std::make_unique<Model>("debug/res/sponza.obj");
+	lion = std::make_unique<Texture>();
+	lion->Filename = L"debug/res/textures/sponza_fabric_diff.dds";
+	lion->Name = "lionTex";
+
+	std::unique_ptr<uint8_t[]> ddsData;
+	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
+	VERIFYD3D12RESULT(LoadDDSTextureFromFile(DX12::Device.Get(), lion->Filename.c_str(), lion->Resource.ReleaseAndGetAddressOf(), ddsData, subresources));
+
+	const UINT64 uploadBufferSize = GetRequiredIntermediateSize(lion->Resource.Get(), 0,
+		static_cast<UINT>(subresources.size()));
+
+	// Create the GPU upload buffer.
+	CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
+
+	auto desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
+
+	ComPtr<ID3D12Resource> uploadRes;
+	VERIFYD3D12RESULT(
+		DX12::Device->CreateCommittedResource(
+			&heapProps,
+			D3D12_HEAP_FLAG_NONE,
+			&desc,
+			D3D12_RESOURCE_STATE_GENERIC_READ,
+			nullptr,
+			IID_PPV_ARGS(lion->UploadHeap.GetAddressOf())));
+
+	UpdateSubresources(DX12::GraphicsCmdList.Get(), lion->Resource.Get(), lion->UploadHeap.Get(),
+		0, 0, static_cast<UINT>(subresources.size()), subresources.data());
+
+	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(lion->Resource.Get(),
+		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
+	DX12::GraphicsCmdList->ResourceBarrier(1, &barrier);
+
+	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 0, DX12::UAVDescriptorSize);
+
+	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
+	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
+	srvDesc.Format = lion->Resource->GetDesc().Format;
+	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
+	srvDesc.Texture2D.MipLevels = lion->Resource->GetDesc().MipLevels;
+	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
+
+	DX12::Device->CreateShaderResourceView(lion->Resource.Get(), &srvDesc, hDescriptor);
 }
 
 void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
@@ -508,14 +553,32 @@ void WorkGraphsDXR::LoadRasterAssets()
 {
 	 // Create the root signature.
 	{
-		
-		CD3DX12_ROOT_PARAMETER rootParameters[1];
-		rootParameters[0].InitAsConstantBufferView(0);
+		CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
+		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_STATIC);
+
+		CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
+		rootParameters[1].InitAsConstantBufferView(0);
 
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
 
-		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters, 0, nullptr, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		D3D12_STATIC_SAMPLER_DESC sampler = {};
+		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		sampler.MipLODBias = 0;
+		sampler.MaxAnisotropy = 0;
+		sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+		sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+		sampler.MinLOD = 0.0f;
+		sampler.MaxLOD = D3D12_FLOAT32_MAX;
+		sampler.ShaderRegister = 0;
+		sampler.RegisterSpace = 0;
+		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters, 1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
 		VERIFYD3D12RESULT(DX12::Device ->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rasterRootSignature)));
 	}
@@ -559,9 +622,12 @@ void WorkGraphsDXR::LoadRasterAssets()
 }
 void WorkGraphsDXR::DoRaster()
 {
+
 	DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
 	DX12::GraphicsCmdList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
-	DX12::GraphicsCmdList->SetGraphicsRootConstantBufferView(0, m_constantBuffer->GetGPUVirtualAddress());
+	DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	DX12::GraphicsCmdList->SetGraphicsRootConstantBufferView(1, m_constantBuffer->GetGPUVirtualAddress());
+
 	DX12::GraphicsCmdList->RSSetViewports(1, &m_viewport);
 	DX12::GraphicsCmdList->RSSetScissorRects(1, &m_scissorRect);
 

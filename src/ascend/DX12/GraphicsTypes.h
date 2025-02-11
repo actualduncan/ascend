@@ -95,3 +95,12 @@ inline D3D12_INDEX_BUFFER_VIEW GpuBuffer::IndexBufferView(size_t Offset, uint32_
 	indexBufferView.SizeInBytes = Size;
 	return indexBufferView;
 }
+
+struct Texture
+{
+	std::string Name;
+	std::wstring Filename;
+
+	ComPtr<ID3D12Resource> Resource = nullptr;
+	ComPtr<ID3D12Resource> UploadHeap = nullptr;
+};
