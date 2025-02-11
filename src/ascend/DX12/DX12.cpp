@@ -33,10 +33,11 @@ namespace DX12
 
 	UINT RTVDescriptorSize = 0;
 	UINT UAVDescriptorSize = 0;
+	UINT DSVDescriptorSize = 0;
 
 	ComPtr<ID3D12DescriptorHeap> RTVDescriptorHeap = nullptr;
 	ComPtr<ID3D12DescriptorHeap> UAVDescriptorHeap = nullptr;
-
+	ComPtr<ID3D12DescriptorHeap> DSVDescriptorHeap = nullptr;
 
 	void Initialize(D3D_FEATURE_LEVEL minFeatureLevel)
 	{
@@ -125,6 +126,13 @@ namespace DX12
 		
 		VERIFYD3D12RESULT(Device->CreateDescriptorHeap(&UAVDescriptorHeapDesc, IID_PPV_ARGS(&UAVDescriptorHeap)));
 		UAVDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+
+		D3D12_DESCRIPTOR_HEAP_DESC DSVDescriptorHeapDesc = { };
+		DSVDescriptorHeapDesc.NumDescriptors = RenderLatency;
+		DSVDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_DSV;
+	
+		VERIFYD3D12RESULT(Device->CreateDescriptorHeap(&DSVDescriptorHeapDesc, IID_PPV_ARGS(&DSVDescriptorHeap)));
+		DSVDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 
 	}
 

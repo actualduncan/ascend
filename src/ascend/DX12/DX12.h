@@ -21,9 +21,12 @@ namespace DX12
 
 	extern UINT RTVDescriptorSize;
 	extern UINT UAVDescriptorSize;
+	extern UINT DSVDescriptorSize;
 
 	extern ComPtr<ID3D12DescriptorHeap> RTVDescriptorHeap;
 	extern ComPtr<ID3D12DescriptorHeap> UAVDescriptorHeap;
+	extern ComPtr<ID3D12DescriptorHeap> DSVDescriptorHeap;
+
 	// for syncro
 	extern UINT64 CurrentCPUFrame;  
 	extern UINT64 CurrentGPUFrame;  
