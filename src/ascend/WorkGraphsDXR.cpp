@@ -1,7 +1,7 @@
 #include "WorkGraphsDXR.h"
 #include "DX12/DX12.h"
 #include "DX12/DX12_Helpers.h"
-#include "DX12/DDSTextureLoader12.h"
+
 #include <d3dcompiler.h>
 #include "Shader/CompiledShaders/WorkGraphRaytracing.hlsl.h"
 #include "Shader/CompiledShaders/ComputeRaytracing.hlsl.h"
@@ -124,54 +124,40 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_camera = std::make_unique<Camera>(hwnd, aspectRatio);
 	LoadModels();
 }
-std::unique_ptr<Texture> lion = nullptr;
+
+std::vector<std::unique_ptr<Texture>> textures;
 D3D12_GPU_DESCRIPTOR_HANDLE texhandle;
 void WorkGraphsDXR::LoadModels()
 {
 	m_sponza = std::make_unique<Model>("debug/res/sponza.obj");
-	lion = std::make_unique<Texture>();
-	lion->Filename = L"debug/res/textures/sponza_fabric_diff.dds";
-	lion->Name = "lionTex";
+	textures.push_back(std::make_unique<Texture>(0, L"debug/res/textures/sponza_column_b_bump.dds"));
+	textures.push_back(std::make_unique<Texture>(1, L"debug/res/textures/sponza_thorn_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(3, L"debug/res/textures/vase_plant.dds"));
+	textures.push_back(std::make_unique<Texture>(2, L"debug/res/textures/vase_round.dds"));
+	textures.push_back(std::make_unique<Texture>(4, L"debug/res/textures/background.dds"));
+	textures.push_back(std::make_unique<Texture>(5, L"debug/res/textures/spnza_bricks_a_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(6, L"debug/res/textures/sponza_arch_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(7, L"debug/res/textures/sponza_ceiling_a_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(8, L"debug/res/textures/sponza_column_a_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(9, L"debug/res/textures/sponza_floor_a_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(10, L"debug/res/textures/sponza_column_c_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(11, L"debug/res/textures/sponza_details_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(12, L"debug/res/textures/sponza_column_b_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(13, L"debug/res/textures/sponza_column_b_bump.dds"));
+	textures.push_back(std::make_unique<Texture>(14, L"debug/res/textures/sponza_flagpole_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(15, L"debug/res/textures/sponza_fabric_green_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(16, L"debug/res/textures/sponza_fabric_blue_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(17, L"debug/res/textures/sponza_fabric_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(18, L"debug/res/textures/sponza_curtain_blue_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(19, L"debug/res/textures/sponza_curtain_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(20, L"debug/res/textures/sponza_curtain_green_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(21, L"debug/res/textures/chain_texture.dds"));
+	textures.push_back(std::make_unique<Texture>(22, L"debug/res/textures/vase_hanging.dds"));
+	textures.push_back(std::make_unique<Texture>(23, L"debug/res/textures/vase_dif.dds"));
+	textures.push_back(std::make_unique<Texture>(24, L"debug/res/textures/lion.dds"));
+	textures.push_back(std::make_unique<Texture>(25, L"debug/res/textures/sponza_roof_diff.dds"));
 
-	std::unique_ptr<uint8_t[]> ddsData;
-	std::vector<D3D12_SUBRESOURCE_DATA> subresources;
-	VERIFYD3D12RESULT(LoadDDSTextureFromFile(DX12::Device.Get(), lion->Filename.c_str(), lion->Resource.ReleaseAndGetAddressOf(), ddsData, subresources));
 
-	const UINT64 uploadBufferSize = GetRequiredIntermediateSize(lion->Resource.Get(), 0,
-		static_cast<UINT>(subresources.size()));
-
-	// Create the GPU upload buffer.
-	CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
-
-	auto desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
-
-	ComPtr<ID3D12Resource> uploadRes;
-	VERIFYD3D12RESULT(
-		DX12::Device->CreateCommittedResource(
-			&heapProps,
-			D3D12_HEAP_FLAG_NONE,
-			&desc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(lion->UploadHeap.GetAddressOf())));
-
-	UpdateSubresources(DX12::GraphicsCmdList.Get(), lion->Resource.Get(), lion->UploadHeap.Get(),
-		0, 0, static_cast<UINT>(subresources.size()), subresources.data());
-
-	auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(lion->Resource.Get(),
-		D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-	DX12::GraphicsCmdList->ResourceBarrier(1, &barrier);
-
-	CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 0, DX12::UAVDescriptorSize);
-
-	D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-	srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-	srvDesc.Format = lion->Resource->GetDesc().Format;
-	srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-	srvDesc.Texture2D.MipLevels = lion->Resource->GetDesc().MipLevels;
-	srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-
-	DX12::Device->CreateShaderResourceView(lion->Resource.Get(), &srvDesc, hDescriptor);
 }
 
 void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
@@ -594,9 +580,9 @@ void WorkGraphsDXR::LoadRasterAssets()
 
 		D3D12_STATIC_SAMPLER_DESC sampler = {};
 		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
-		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
-		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_BORDER;
+		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
 		sampler.MipLODBias = 0;
 		sampler.MaxAnisotropy = 0;
 		sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
@@ -606,7 +592,6 @@ void WorkGraphsDXR::LoadRasterAssets()
 		sampler.ShaderRegister = 0;
 		sampler.RegisterSpace = 0;
 		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
-
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters, 1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
 		VERIFYD3D12RESULT(DX12::Device ->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rasterRootSignature)));
@@ -657,7 +642,7 @@ void WorkGraphsDXR::DoRaster()
 
 	DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
 	DX12::GraphicsCmdList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
-	DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+	//DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 	DX12::GraphicsCmdList->SetGraphicsRootConstantBufferView(1, m_constantBuffer->GetGPUVirtualAddress());
 
 	DX12::GraphicsCmdList->RSSetViewports(1, &m_viewport);
@@ -675,8 +660,12 @@ void WorkGraphsDXR::DoRaster()
 	const uint64_t modelMeshCount = m_sponza->GetModelMeshVector().size();
 	for (int i = 0; i < modelMeshCount; ++i)
 	{
+			
 		auto mesh = m_sponza->GetModelMeshVector()[i];
 
+		CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx, DX12::UAVDescriptorSize);
+		DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, hDescriptor);
+		
 		D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
 		D3D12_INDEX_BUFFER_VIEW ibView = mesh.GetIndexBufferView();
 

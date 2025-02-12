@@ -27,6 +27,7 @@ struct Mesh
 
 	D3D12_GPU_VIRTUAL_ADDRESS vertexBufferAddress;
 	D3D12_GPU_VIRTUAL_ADDRESS indexBufferAddress;
+	int materialIdx;
 };
 
 class Model

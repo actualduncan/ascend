@@ -115,9 +115,9 @@ void Model::InitFromAssimpMesh(const aiMesh& assimpMesh, Vertex* dstVertices, In
 	{
 		Vertex vert;
 
-		vert.Position.x = assimpMesh.mVertices[i].x;
-		vert.Position.y = assimpMesh.mVertices[i].y;
-		vert.Position.z = assimpMesh.mVertices[i].z;
+		vert.Position.x = assimpMesh.mVertices[i].x * 0.3;
+		vert.Position.y = assimpMesh.mVertices[i].y * 0.3;
+		vert.Position.z = assimpMesh.mVertices[i].z * 0.3;
 
 		vert.Normal.x = assimpMesh.mNormals[i].x;
 		vert.Normal.y = assimpMesh.mNormals[i].y;
@@ -137,6 +137,7 @@ void Model::InitFromAssimpMesh(const aiMesh& assimpMesh, Vertex* dstVertices, In
 		dstIndices[triIdx * 3 + 2] = UINT16(assimpMesh.mFaces[triIdx].mIndices[2]);
 	}
 
+	mesh.materialIdx = assimpMesh.mMaterialIndex;
 
 	m_modelMeshes.push_back(mesh);
 }

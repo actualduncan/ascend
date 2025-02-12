@@ -98,6 +98,7 @@ inline D3D12_INDEX_BUFFER_VIEW GpuBuffer::IndexBufferView(size_t Offset, uint32_
 
 struct Texture
 {
+	Texture(int index, std::wstring filename);
 	std::string Name;
 	std::wstring Filename;
 
