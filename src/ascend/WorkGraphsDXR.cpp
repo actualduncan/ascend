@@ -626,7 +626,7 @@ void WorkGraphsDXR::LoadRasterAssets()
 		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 		psoDesc.DepthStencilState.DepthEnable = TRUE;
 		psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-		psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL; 
+		psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
 		psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
 		psoDesc.DepthStencilState.StencilEnable = FALSE;
 		psoDesc.SampleMask = UINT_MAX;
@@ -634,7 +634,28 @@ void WorkGraphsDXR::LoadRasterAssets()
 		psoDesc.NumRenderTargets = 1;
 		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psoDesc.SampleDesc.Count = 1;
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPso = psoDesc;
+		transparentPso.DepthStencilState.DepthEnable = TRUE;
+		transparentPso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+		transparentPso.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+		transparentPso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+
+		D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
+		transparencyBlendDesc.BlendEnable = TRUE;
+		transparencyBlendDesc.LogicOpEnable = FALSE;
+		transparencyBlendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		transparencyBlendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+		transparencyBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+		transparencyBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+		transparencyBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+		transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+		transparencyBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+		transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+		transparentPso.BlendState.RenderTarget[0] = transparencyBlendDesc;
+
 		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_rasterPipelineState)));
+		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&transparentPso, IID_PPV_ARGS(&m_transparentPipelineState)));
 	}
 }
 void WorkGraphsDXR::DoRaster()
@@ -652,6 +673,7 @@ void WorkGraphsDXR::DoRaster()
 	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(DX12::RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), m_swapChain.GetD3DObject()->GetCurrentBackBufferIndex(), DX12::RTVDescriptorSize);
 	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(DX12::DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 0, DX12::DSVDescriptorSize);
 	DX12::GraphicsCmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+	DX12::GraphicsCmdList->OMSetStencilRef(1);
 	DX12::GraphicsCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
@@ -663,16 +685,42 @@ void WorkGraphsDXR::DoRaster()
 			
 		auto mesh = m_sponza->GetModelMeshVector()[i];
 
-		CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx, DX12::UAVDescriptorSize);
-		DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, hDescriptor);
-		
-		D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
-		D3D12_INDEX_BUFFER_VIEW ibView = mesh.GetIndexBufferView();
+		if (mesh.materialIdx != 1 && mesh.materialIdx != 3)
+		{
+			DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
+			CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx, DX12::UAVDescriptorSize);
+			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, hDescriptor);
 
-		DX12::GraphicsCmdList->IASetVertexBuffers(0, 1, &vbView);
-		DX12::GraphicsCmdList->IASetIndexBuffer(&ibView);
-		DX12::GraphicsCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+			D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
+			D3D12_INDEX_BUFFER_VIEW ibView = mesh.GetIndexBufferView();
 
-		DX12::GraphicsCmdList->DrawIndexedInstanced(mesh.numIndices, 1, 0, 0, 0);
+			DX12::GraphicsCmdList->IASetVertexBuffers(0, 1, &vbView);
+			DX12::GraphicsCmdList->IASetIndexBuffer(&ibView);
+			DX12::GraphicsCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			DX12::GraphicsCmdList->DrawIndexedInstanced(mesh.numIndices, 1, 0, 0, 0);
+		}
+
+	}
+	for (int i = 0; i < modelMeshCount; ++i)
+	{
+
+		auto mesh = m_sponza->GetModelMeshVector()[i];
+		if (mesh.materialIdx == 1  || mesh.materialIdx == 3)
+		{
+			DX12::GraphicsCmdList->SetPipelineState(m_transparentPipelineState.Get());
+			CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx, DX12::UAVDescriptorSize);
+			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, hDescriptor);
+
+			D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
+			D3D12_INDEX_BUFFER_VIEW ibView = mesh.GetIndexBufferView();
+
+			DX12::GraphicsCmdList->IASetVertexBuffers(0, 1, &vbView);
+			DX12::GraphicsCmdList->IASetIndexBuffer(&ibView);
+			DX12::GraphicsCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			DX12::GraphicsCmdList->DrawIndexedInstanced(mesh.numIndices, 1, 0, 0, 0);
+		}
+
 	}
 }

@@ -92,6 +92,7 @@ private:
 	void DoRaster();
 	ComPtr<ID3D12RootSignature> m_rasterRootSignature;
 	ComPtr<ID3D12PipelineState> m_rasterPipelineState;
+	ComPtr<ID3D12PipelineState> m_transparentPipelineState;
 	ComPtr<ID3D12Resource> m_depthStencilBuffer;
 	CD3DX12_VIEWPORT m_viewport;
 	CD3DX12_RECT m_scissorRect;
