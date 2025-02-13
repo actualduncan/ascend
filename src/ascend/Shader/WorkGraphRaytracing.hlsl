@@ -26,7 +26,15 @@ inline RayDesc GenerateCameraRay(uint2 index, in float3 cameraPosition, in float
 
     return ray;
 }
+float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
+{
+    float3 pixelToLight = normalize(float3(10,10,10) - hitPosition);
 
+    // Diffuse contribution.
+    float fNDotL = max(0.0f, dot(pixelToLight, normal));
+
+    return float4(0.7, 0.7, 0.7, 1) * float4(1, 1, 0.7, 1) * fNDotL;
+}
 RWTexture2D<float4> RenderTarget : register(u0);
 RaytracingAccelerationStructure Scene : register(t0, space0);
 
@@ -43,21 +51,30 @@ void EntryFunction(uint3 DTid : SV_DispatchThreadID)
     ray.TMin = 0.01;
     ray.TMax = 10000;
     
-    RayQuery < RAY_FLAG_CULL_NON_OPAQUE |
-             RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
-             RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH > rayQuery;
+    RayQuery <  RAY_FLAG_FORCE_OPAQUE > rayQuery;
     rayQuery.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
     rayQuery.Proceed();
    
     if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
-        
-        RenderTarget[DTid.xy] = float4(1.0, 0, 0, 1.0);
+        float3 rayhit = ray.Origin + (ray.Direction * rayQuery.CommittedRayT());
+        float3 normal = float3(0.2, -0.7, 0);
+        if(rayhit.x < 0)
+        {
+
+        }
+        else
+        {
+
+        }
+
+        RenderTarget[DTid.xy] = CalculateDiffuseLighting(rayhit, normal) + float4(0.5, 0.5, 0.5, 1);
+
+
     }
     else
     { 
         RenderTarget[DTid.xy] = float4(0, 0, 0, 1.0);
-
     }
 
     GroupMemoryBarrierWithGroupSync();
