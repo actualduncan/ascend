@@ -69,6 +69,7 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	optClear.DepthStencil.Depth = 1.0f;
 	optClear.DepthStencil.Stencil = 0;
 
+	// window size properties therefore should be in swapchain info? Or create depth buffer struct
 	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 	VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
 		&heapProp,
@@ -80,33 +81,14 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	DX12::Device->CreateDepthStencilView(m_depthStencilBuffer.Get(), nullptr, DX12::DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
 
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_depthStencilBuffer.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE, 0);
+
 	// Create the constant buffer.
 	{
-		const UINT constantBufferSize = sizeof(RayTraceConstants);    // CB size is required to be 256-byte aligned.
-		auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(constantBufferSize);
+		const UINT constantBufferSize = sizeof(RayTraceConstants);   
+		m_rayTraceConstantBuffer.Create(L"Constant Buffer", constantBufferSize);
 
-		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
-			&uploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&m_constantBuffer)));
-		m_constantBuffer->SetName(L"Constant Buffer");
-		// Describe and create a constant buffer view.
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-		cbvDesc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress();
-		cbvDesc.SizeInBytes = constantBufferSize;
-		DX12::Device->CreateConstantBufferView(&cbvDesc, DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-		
-		// Map and initialize the constant buffer. We don't unmap this until the
-		// app closes. Keeping things mapped for the lifetime of the resource is okay.
-		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-		VERIFYD3D12RESULT(m_constantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
-		memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
 	}
-
+	
 	if (true)
 	{
 		LoadRasterAssets();
@@ -170,7 +152,7 @@ void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
 	XMVECTOR det = XMMatrixDeterminant(viewProj);
 	m_constantBufferData.InvViewProjection = XMMatrixTranspose(viewProj);//XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
 	m_constantBufferData.CameraPosWS = XMFLOAT4(m_camera->GetPosition().x, m_camera->GetPosition().y, m_camera->GetPosition().z, 1.0f);
-	memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+	m_rayTraceConstantBuffer.UpdateContents(&m_constantBufferData, sizeof(RayTraceConstants));
 
 	// imgui frame
 	// other stuff
@@ -329,7 +311,7 @@ void WorkGraphsDXR::DispatchWorkGraph()
 	//DX12::GraphicsCmdList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
 	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_workGraphOutputUavDescriptorHandle);
 	DX12::GraphicsCmdList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
-	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_constantBuffer->GetGPUVirtualAddress());
+	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
 
 	D3D12_DISPATCH_GRAPH_DESC dispatchDesc = {};
 	dispatchDesc.Mode = D3D12_DISPATCH_MODE_NODE_CPU_INPUT;
@@ -549,7 +531,7 @@ void WorkGraphsDXR::DoCompute()
 	DX12::GraphicsCmdList->SetComputeRootSignature(m_computeRootSignature.Get());
 	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_computeOutputUavDescriptorHandle);
 	DX12::GraphicsCmdList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
-	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_constantBuffer->GetGPUVirtualAddress());
+	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
 	DX12::GraphicsCmdList->Dispatch(m_width, m_height, 1);
 }
 
@@ -664,7 +646,7 @@ void WorkGraphsDXR::DoRaster()
 	DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
 	DX12::GraphicsCmdList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
 	//DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-	DX12::GraphicsCmdList->SetGraphicsRootConstantBufferView(1, m_constantBuffer->GetGPUVirtualAddress());
+	DX12::GraphicsCmdList->SetGraphicsRootConstantBufferView(1, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
 
 	DX12::GraphicsCmdList->RSSetViewports(1, &m_viewport);
 	DX12::GraphicsCmdList->RSSetScissorRects(1, &m_scissorRect);

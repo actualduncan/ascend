@@ -29,7 +29,7 @@ private:
 	RayTraceConstants m_constantBufferData;
 	ComPtr<ID3D12Resource> m_indexBuffer;
 	ComPtr<ID3D12Resource> m_vertexBuffer;
-	ComPtr<ID3D12Resource> m_constantBuffer;
+	ConstantBuffer m_rayTraceConstantBuffer;
 	UINT8* m_pCbvDataBegin = nullptr;
 
 	std::unique_ptr<Model> m_sponza;
@@ -77,7 +77,7 @@ private:
 	ComPtr<ID3D12Resource> instanceDescs;
 	GpuBuffer tlasScratchBuffer;
 	std::vector<GpuBuffer> blasScratchBuffers;
-
+	
 	// compute shennanigans
 	void LoadComputeAssets();
 	void DoCompute();

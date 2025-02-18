@@ -96,6 +96,23 @@ inline D3D12_INDEX_BUFFER_VIEW GpuBuffer::IndexBufferView(size_t Offset, uint32_
 	return indexBufferView;
 }
 
+class ConstantBuffer : public Buffer
+{
+public:
+	ConstantBuffer() {};
+	void Create(const std::wstring& name, size_t BufferSize);
+
+	void UpdateContents(void* data, size_t size);
+	void* BufferStartPtr;
+};
+
+class DepthBuffer : public Buffer
+{
+
+};
+
+//                                      Texture
+//----------------------------------------------------------------------------------------------
 struct Texture
 {
 	Texture(int index, std::wstring filename);

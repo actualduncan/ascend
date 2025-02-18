@@ -176,6 +176,38 @@ void GpuBuffer::Create(const std::wstring& name, uint32_t NumElements, uint32_t 
 
 }
 
+//                                      Constant Buffer
+//----------------------------------------------------------------------------------------------
+
+void ConstantBuffer::Create(const std::wstring& name, size_t bufferSize)
+{
+    m_bufferSize = bufferSize;
+
+    auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
+    auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(m_bufferSize);
+
+    VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+        &uploadHeapProperties,
+        D3D12_HEAP_FLAG_NONE,
+        &bufferDesc,
+        D3D12_RESOURCE_STATE_GENERIC_READ,
+        nullptr,
+        IID_PPV_ARGS(&m_resource)));
+    m_resource->SetName(name.c_str());
+    // Describe and create a constant buffer view.
+    D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
+    cbvDesc.BufferLocation = m_resource->GetGPUVirtualAddress();
+    cbvDesc.SizeInBytes = m_bufferSize;
+    DX12::Device->CreateConstantBufferView(&cbvDesc, DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+    m_gpuVirtualAddress = m_resource->GetGPUVirtualAddress();
+
+    BufferStartPtr = Map();
+}
+
+void ConstantBuffer::UpdateContents(void* data, size_t size)
+{
+    memcpy(BufferStartPtr, data, size);
+}
 #include "DDSTextureLoader12.h"
 Texture::Texture(int index, std::wstring filename)
 {
