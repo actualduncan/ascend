@@ -96,19 +96,25 @@ inline D3D12_INDEX_BUFFER_VIEW GpuBuffer::IndexBufferView(size_t Offset, uint32_
 	return indexBufferView;
 }
 
+//                                      ConstantBuffer
+//----------------------------------------------------------------------------------------------
 class ConstantBuffer : public Buffer
 {
 public:
 	ConstantBuffer() {};
-	void Create(const std::wstring& name, size_t BufferSize);
 
+	void Create(const std::wstring& name, size_t BufferSize);
 	void UpdateContents(void* data, size_t size);
-	void* BufferStartPtr;
+
+private:
+	void* BufferStartPtr = nullptr;
 };
 
-class DepthBuffer : public Buffer
+class DepthStencilBuffer : public Buffer
 {
-
+public:
+	DepthStencilBuffer() {};
+	void Create(const std::wstring& name, uint32_t width, uint32_t height);
 };
 
 //                                      Texture

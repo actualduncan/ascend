@@ -25,12 +25,12 @@ public:
 
 private:
 	SwapChain m_swapChain;
-
-	RayTraceConstants m_constantBufferData;
+	DepthStencilBuffer m_depthStencilBuffer;
 	ComPtr<ID3D12Resource> m_indexBuffer;
 	ComPtr<ID3D12Resource> m_vertexBuffer;
+
 	ConstantBuffer m_rayTraceConstantBuffer;
-	UINT8* m_pCbvDataBegin = nullptr;
+	RayTraceConstants m_constantBufferData;
 
 	std::unique_ptr<Model> m_sponza;
 	std::unique_ptr<Camera> m_camera;
@@ -93,7 +93,7 @@ private:
 	ComPtr<ID3D12RootSignature> m_rasterRootSignature;
 	ComPtr<ID3D12PipelineState> m_rasterPipelineState;
 	ComPtr<ID3D12PipelineState> m_transparentPipelineState;
-	ComPtr<ID3D12Resource> m_depthStencilBuffer;
+
 	CD3DX12_VIEWPORT m_viewport;
 	CD3DX12_RECT m_scissorRect;
 };

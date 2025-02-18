@@ -51,42 +51,12 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height));
 	m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height));
 
-	D3D12_RESOURCE_DESC depthStencilDesc = {};
-	depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
-	depthStencilDesc.Alignment = 0;
-	depthStencilDesc.Width = width;
-	depthStencilDesc.Height = height;
-	depthStencilDesc.DepthOrArraySize = 1;
-	depthStencilDesc.MipLevels = 1;
-	depthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	depthStencilDesc.SampleDesc.Count = 1;
-	depthStencilDesc.SampleDesc.Quality = 0;
-	depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
-	depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
-
-	D3D12_CLEAR_VALUE optClear = {};
-	optClear.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	optClear.DepthStencil.Depth = 1.0f;
-	optClear.DepthStencil.Stencil = 0;
-
-	// window size properties therefore should be in swapchain info? Or create depth buffer struct
-	auto heapProp = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
-	VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
-		&heapProp,
-		D3D12_HEAP_FLAG_NONE,
-		&depthStencilDesc,
-		D3D12_RESOURCE_STATE_COMMON,
-		&optClear,
-		IID_PPV_ARGS(&m_depthStencilBuffer)));
-	DX12::Device->CreateDepthStencilView(m_depthStencilBuffer.Get(), nullptr, DX12::DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-
-	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_depthStencilBuffer.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE, 0);
+	m_depthStencilBuffer.Create(L"ZBuffer", m_width, m_height);
 
 	// Create the constant buffer.
 	{
 		const UINT constantBufferSize = sizeof(RayTraceConstants);   
 		m_rayTraceConstantBuffer.Create(L"Constant Buffer", constantBufferSize);
-
 	}
 	
 	if (true)
