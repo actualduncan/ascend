@@ -56,9 +56,9 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 
 	if (true)
 	{
-		LoadRasterAssets();
-		//CreateWorkGraphRootSignature();
-		//CreateWorkGraph();
+		//LoadRasterAssets();
+		CreateWorkGraphRootSignature();
+		CreateWorkGraph();
 	}
 	else
 	{
@@ -81,6 +81,7 @@ void WorkGraphsDXR::LoadModels()
 {
 	// make better texture manager for sponza
 	m_sponza = std::make_unique<Model>("debug/res/sponza.obj");
+	/*
 	textures.push_back(std::make_unique<Texture>(0, L"debug/res/textures/sponza_column_b_bump.dds"));
 	textures.push_back(std::make_unique<Texture>(1, L"debug/res/textures/sponza_thorn_diff.dds"));
 	textures.push_back(std::make_unique<Texture>(3, L"debug/res/textures/vase_plant.dds"));
@@ -107,7 +108,7 @@ void WorkGraphsDXR::LoadModels()
 	textures.push_back(std::make_unique<Texture>(23, L"debug/res/textures/vase_dif.dds"));
 	textures.push_back(std::make_unique<Texture>(24, L"debug/res/textures/lion.dds"));
 	textures.push_back(std::make_unique<Texture>(25, L"debug/res/textures/sponza_roof_diff.dds"));
-
+	*/
 
 }
 
@@ -119,7 +120,7 @@ void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
 	m_camera->Update(dt, *inputCommands);
 	XMMATRIX viewProj = m_camera->GetView() * m_camera->GetProjectionMatrix();
 	XMVECTOR det = XMMatrixDeterminant(viewProj);
-	m_constantBufferData.InvViewProjection = XMMatrixTranspose(viewProj);//XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
+	m_constantBufferData.InvViewProjection = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
 	m_constantBufferData.CameraPosWS = XMFLOAT4(m_camera->GetPosition().x, m_camera->GetPosition().y, m_camera->GetPosition().z, 1.0f);
 	m_rayTraceConstantBuffer.UpdateContents(&m_constantBufferData, sizeof(RayTraceConstants));
 
@@ -138,14 +139,14 @@ void WorkGraphsDXR::Render()
 
 	if (m_shouldBuildAccelerationStructures)
 	{
-		//BuildAccelerationStructuresForCompute();
+		BuildAccelerationStructuresForCompute();
 	}
 
 	if (true)
 	{
-		DoRaster();
-		//DispatchWorkGraph();
-		//CopyWorkGraphOutputToBackBuffer();
+		//DoRaster();
+		DispatchWorkGraph();
+		CopyWorkGraphOutputToBackBuffer();
 	}
 	else
 	{
