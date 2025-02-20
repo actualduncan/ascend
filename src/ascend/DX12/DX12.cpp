@@ -113,14 +113,14 @@ namespace DX12
 
 		// Create Descriptors
 		D3D12_DESCRIPTOR_HEAP_DESC RTVDescriptorHeapDesc = { };
-		RTVDescriptorHeapDesc.NumDescriptors = RenderLatency;
+		RTVDescriptorHeapDesc.NumDescriptors = 3;
 		RTVDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
 		
 		VERIFYD3D12RESULT(Device->CreateDescriptorHeap(&RTVDescriptorHeapDesc, IID_PPV_ARGS(&RTVDescriptorHeap)));
 		RTVDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 		D3D12_DESCRIPTOR_HEAP_DESC UAVDescriptorHeapDesc = { };
-		UAVDescriptorHeapDesc.NumDescriptors = 27;
+		UAVDescriptorHeapDesc.NumDescriptors = 30;
 		UAVDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		UAVDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		

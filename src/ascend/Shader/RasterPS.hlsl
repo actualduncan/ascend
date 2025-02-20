@@ -12,11 +12,19 @@ struct PSInput
     float4 normal : NORMAL;
     float2 uv : TEXCOORD;
 };
-
+struct PSOutput
+{
+    float4 Color : SV_TARGET0;
+    float4 Normal : SV_Target1;
+};
 Texture2D g_texture : register(t0);
 SamplerState g_sampler : register(s0);
 
-float4 PSMain(PSInput input) : SV_TARGET
+PSOutput PSMain(PSInput input)
 {
-    return input.normal;
+    PSOutput output;
+    output.Color = g_texture.Sample(g_sampler, input.uv) * float4(1, 1, 1, 1); //Set first output
+    output.Normal = input.normal; //Set second output
+
+    return output;
 }

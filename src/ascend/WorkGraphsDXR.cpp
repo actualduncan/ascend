@@ -14,6 +14,7 @@ namespace GlobalRootSignatureParams {
 
 	enum Value {
 		OutputViewSlot = 0,
+		NormSlot,
 		AccelerationStructureSlot,
 		ConstantBufferSlot,
 		Count
@@ -245,12 +246,14 @@ void WorkGraphsDXR::CreateWorkGraph()
 
 void WorkGraphsDXR::CreateWorkGraphRootSignature()
 {
-	CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
-	UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-	CD3DX12_ROOT_PARAMETER rootParameters[3];
-	rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
-	rootParameters[1].InitAsShaderResourceView(0);
-	rootParameters[2].InitAsConstantBufferView(0);
+	CD3DX12_DESCRIPTOR_RANGE UAVDescriptor[2];
+	UAVDescriptor[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+	UAVDescriptor[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
+	CD3DX12_ROOT_PARAMETER rootParameters[4];
+	rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor[0]);
+	rootParameters[1].InitAsDescriptorTable(1, &UAVDescriptor[1]);
+	rootParameters[2].InitAsShaderResourceView(0);
+	rootParameters[3].InitAsConstantBufferView(0);
 	ComPtr<ID3DBlob> signature;
 	ComPtr<ID3DBlob> error;
 
@@ -267,6 +270,8 @@ void WorkGraphsDXR::CreateWorkGraphRootSignature()
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
 			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_workGraphOutput)));
 
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
 
 		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 0, DX12::UAVDescriptorSize);
 		//m_raytracingOutputResourceUAVDescriptorHeapIndex = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, descriptorIndexToUse, m_computeDescriptorSize);
@@ -274,6 +279,11 @@ void WorkGraphsDXR::CreateWorkGraphRootSignature()
 		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 		DX12::Device->CreateUnorderedAccessView(m_workGraphOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
 		m_workGraphOutputUavDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle2 = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 1, DX12::UAVDescriptorSize);
+		//m_raytracingOutputResourceUAVDescriptorHeapIndex = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, descriptorIndexToUse, m_computeDescriptorSize);
+		UAVDesc = {};
+		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		DX12::Device->CreateUnorderedAccessView(m_normalTex.Get(), nullptr, &UAVDesc, uavDescriptorHandle2);
 
 	}
 }
@@ -284,6 +294,8 @@ void WorkGraphsDXR::DispatchWorkGraph()
 	//D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
 	//DX12::GraphicsCmdList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
 	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_workGraphOutputUavDescriptorHandle);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), 1, DX12::UAVDescriptorSize);
+	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::NormSlot, hDescriptor);
 	DX12::GraphicsCmdList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
 	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
 
@@ -314,11 +326,15 @@ void WorkGraphsDXR::CopyRasterOutputToWorkGraphInput()
 {
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
-
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
 	DX12::GraphicsCmdList->CopyResource(m_workGraphOutput.Get(), m_swapChain.BackBuffer());
-
+	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_normalTexRTV.Get());
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
+
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
 
 }
 
@@ -536,7 +552,7 @@ void WorkGraphsDXR::LoadRasterAssets()
 {
 	 // Create the root signature.
 	{
-		CD3DX12_DESCRIPTOR_RANGE1 ranges[1];
+		CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
 		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
 
 		CD3DX12_ROOT_PARAMETER1 rootParameters[2];
@@ -599,8 +615,9 @@ void WorkGraphsDXR::LoadRasterAssets()
 		psoDesc.DepthStencilState.StencilEnable = FALSE;
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		psoDesc.NumRenderTargets = 1;
+		psoDesc.NumRenderTargets = 2;
 		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		psoDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psoDesc.SampleDesc.Count = 1;
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPso = psoDesc;
@@ -624,6 +641,22 @@ void WorkGraphsDXR::LoadRasterAssets()
 
 		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_rasterPipelineState)));
 		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&transparentPso, IID_PPV_ARGS(&m_transparentPipelineState)));
+
+		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, nullptr, IID_PPV_ARGS(&m_normalTexRTV)));
+
+
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		rtvDesc.Texture2D.MipSlice = 0;
+		rtvDesc.Texture2D.PlaneSlice = 0;
+
+		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptor(DX12::RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 2, DX12::RTVDescriptorSize);
+		DX12::Device->CreateRenderTargetView(m_normalTexRTV.Get(), &rtvDesc, rtvDescriptor);
 	}
 }
 void WorkGraphsDXR::DoRaster()
@@ -631,21 +664,22 @@ void WorkGraphsDXR::DoRaster()
 
 	DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
 	DX12::GraphicsCmdList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
-	//DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
 	DX12::GraphicsCmdList->SetGraphicsRootConstantBufferView(1, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
 
 	DX12::GraphicsCmdList->RSSetViewports(1, &m_viewport);
 	DX12::GraphicsCmdList->RSSetScissorRects(1, &m_scissorRect);
 
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandle(DX12::RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), m_swapChain.GetD3DObject()->GetCurrentBackBufferIndex(), DX12::RTVDescriptorSize);
+	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandles[2];
+	rtvHandles[0] = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), m_swapChain.GetD3DObject()->GetCurrentBackBufferIndex(), DX12::RTVDescriptorSize);
+	rtvHandles[1] = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 2, DX12::RTVDescriptorSize);
 	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(DX12::DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 0, DX12::DSVDescriptorSize);
-	DX12::GraphicsCmdList->OMSetRenderTargets(1, &rtvHandle, FALSE, &dsvHandle);
+	DX12::GraphicsCmdList->OMSetRenderTargets(2, rtvHandles, FALSE, &dsvHandle);
 	DX12::GraphicsCmdList->OMSetStencilRef(1);
 	DX12::GraphicsCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
-	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandle, clearColor, 0, nullptr);
+	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[0], clearColor, 0, nullptr);
 
 	const uint64_t modelMeshCount = m_sponza->GetModelMeshVector().size();
 	for (int i = 0; i < modelMeshCount; ++i)
@@ -656,7 +690,7 @@ void WorkGraphsDXR::DoRaster()
 		if (mesh.materialIdx != 1 && mesh.materialIdx != 3)
 		{
 			DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
-			CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx + 1, DX12::UAVDescriptorSize);
+			CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx + 2, DX12::UAVDescriptorSize);
 			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, hDescriptor);
 
 			D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
@@ -677,7 +711,7 @@ void WorkGraphsDXR::DoRaster()
 		if (mesh.materialIdx == 1  || mesh.materialIdx == 3)
 		{
 			DX12::GraphicsCmdList->SetPipelineState(m_transparentPipelineState.Get());
-			CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx + 1, DX12::UAVDescriptorSize);
+			CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx + 2, DX12::UAVDescriptorSize);
 			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, hDescriptor);
 
 			D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
