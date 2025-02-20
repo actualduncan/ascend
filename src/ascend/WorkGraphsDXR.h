@@ -5,9 +5,10 @@
 struct RayTraceConstants
 {
 	//XMFLOAT4X4 InvViewProjection;
-	XMMATRIX InvViewProjection;
+	XMMATRIX ViewProjection;
+	XMMATRIX InvProjection;
 	XMFLOAT4 CameraPosWS;
-	XMFLOAT2 yes[22];
+	XMFLOAT2 yes[14];
 };
 
 class WorkGraphsDXR
@@ -54,6 +55,7 @@ private:
 	void DispatchWorkGraph();
 	void CopyWorkGraphOutputToBackBuffer();
 
+	void CopyRasterOutputToWorkGraphInput();
 #pragma endregion
 
 	// TODO: move to external DXR wrapper
