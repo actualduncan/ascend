@@ -54,8 +54,6 @@ private:
 	void DispatchWorkGraph();
 	void CopyWorkGraphOutputToBackBuffer();
 
-
-
 #pragma endregion
 
 	// TODO: move to external DXR wrapper

@@ -52,13 +52,8 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height));
 
 	m_depthStencilBuffer.Create(L"ZBuffer", m_width, m_height);
+	m_rayTraceConstantBuffer.Create(L"Constant Buffer", sizeof(RayTraceConstants));
 
-	// Create the constant buffer.
-	{
-		const UINT constantBufferSize = sizeof(RayTraceConstants);   
-		m_rayTraceConstantBuffer.Create(L"Constant Buffer", constantBufferSize);
-	}
-	
 	if (true)
 	{
 		LoadRasterAssets();
@@ -72,15 +67,19 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 
 	DX12::WaitForGPU();
 	CreateRaytracingInterfaces();
+
 	float aspectRatio = float(width) / float(height);
 	m_camera = std::make_unique<Camera>(hwnd, aspectRatio);
+
 	LoadModels();
 }
 
+// why is this floating about
 std::vector<std::unique_ptr<Texture>> textures;
 D3D12_GPU_DESCRIPTOR_HANDLE texhandle;
 void WorkGraphsDXR::LoadModels()
 {
+	// make better texture manager for sponza
 	m_sponza = std::make_unique<Model>("debug/res/sponza.obj");
 	textures.push_back(std::make_unique<Texture>(0, L"debug/res/textures/sponza_column_b_bump.dds"));
 	textures.push_back(std::make_unique<Texture>(1, L"debug/res/textures/sponza_thorn_diff.dds"));
