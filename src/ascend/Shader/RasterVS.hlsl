@@ -1,5 +1,6 @@
 cbuffer RayTraceConstants : register(b0)
 {
+    float4x4 ViewProjection;
     float4x4 InvViewProjection;
     float4 CameraPosWS;
     float2 yes[22];
@@ -20,7 +21,8 @@ PSInput VSMain(float4 position : POSITION, float4 normal : NORMAL, float2 uv : T
 {
     PSInput result;
 
-    result.position = mul(float4(position.xyz, 1.0f), InvViewProjection);
+    result.position = mul(float4(position.xyz, 1.0f), ViewProjection);
+    result.normal = normal;
     result.uv = uv;
     return result;
 }

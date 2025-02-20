@@ -1,8 +1,9 @@
 cbuffer RayTraceConstants : register(b0)
 {
+    float4x4 ViewProjection;
     float4x4 InvViewProjection;
     float4 CameraPosWS;
-    float2 yes[22];
+    float2 yes[14];
 };
 
 
@@ -58,7 +59,7 @@ void EntryFunction(uint3 DTid : SV_DispatchThreadID)
     if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
         float3 rayhit = ray.Origin + (ray.Direction * rayQuery.CommittedRayT());
-        float3 normal = float3(0.2, -0.7, 0);
+        float3 normal = RenderTarget[DTid.xy].xyz;
         if(rayhit.x < 0)
         {
 
@@ -68,7 +69,7 @@ void EntryFunction(uint3 DTid : SV_DispatchThreadID)
 
         }
 
-        RenderTarget[DTid.xy] = CalculateDiffuseLighting(rayhit, normal) + float4(0.5, 0.5, 0.5, 1);
+        RenderTarget[DTid.xy] *= CalculateDiffuseLighting(rayhit, normal);
 
 
     }

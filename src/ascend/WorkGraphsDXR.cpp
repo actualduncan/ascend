@@ -56,12 +56,13 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 
 	if (true)
 	{
-		//LoadRasterAssets();
+		LoadRasterAssets();
 		CreateWorkGraphRootSignature();
 		CreateWorkGraph();
 	}
 	else
 	{
+
 		LoadComputeAssets();
 	}
 
@@ -81,7 +82,7 @@ void WorkGraphsDXR::LoadModels()
 {
 	// make better texture manager for sponza
 	m_sponza = std::make_unique<Model>("debug/res/sponza.obj");
-	/*
+	
 	textures.push_back(std::make_unique<Texture>(0, L"debug/res/textures/sponza_column_b_bump.dds"));
 	textures.push_back(std::make_unique<Texture>(1, L"debug/res/textures/sponza_thorn_diff.dds"));
 	textures.push_back(std::make_unique<Texture>(3, L"debug/res/textures/vase_plant.dds"));
@@ -108,7 +109,7 @@ void WorkGraphsDXR::LoadModels()
 	textures.push_back(std::make_unique<Texture>(23, L"debug/res/textures/vase_dif.dds"));
 	textures.push_back(std::make_unique<Texture>(24, L"debug/res/textures/lion.dds"));
 	textures.push_back(std::make_unique<Texture>(25, L"debug/res/textures/sponza_roof_diff.dds"));
-	*/
+	
 
 }
 
@@ -120,7 +121,8 @@ void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
 	m_camera->Update(dt, *inputCommands);
 	XMMATRIX viewProj = m_camera->GetView() * m_camera->GetProjectionMatrix();
 	XMVECTOR det = XMMatrixDeterminant(viewProj);
-	m_constantBufferData.InvViewProjection = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
+	m_constantBufferData.ViewProjection = XMMatrixTranspose( viewProj);
+	m_constantBufferData.InvProjection = XMMatrixTranspose(XMMatrixInverse(nullptr,viewProj));
 	m_constantBufferData.CameraPosWS = XMFLOAT4(m_camera->GetPosition().x, m_camera->GetPosition().y, m_camera->GetPosition().z, 1.0f);
 	m_rayTraceConstantBuffer.UpdateContents(&m_constantBufferData, sizeof(RayTraceConstants));
 
@@ -144,12 +146,14 @@ void WorkGraphsDXR::Render()
 
 	if (true)
 	{
-		//DoRaster();
+		DoRaster();
+		CopyRasterOutputToWorkGraphInput();
 		DispatchWorkGraph();
 		CopyWorkGraphOutputToBackBuffer();
 	}
 	else
 	{
+
 		DoCompute();
 		CopyComputeOutputToBackBuffer();
 	}
@@ -304,6 +308,18 @@ void WorkGraphsDXR::DispatchWorkGraph()
 	// Clear backing memory initialization flag, as the graph has run at least once now
 	// See https://microsoft.github.io/DirectX-Specs/d3d/WorkGraphs.html#d3d12_set_work_graph_flags
 	m_workGraphProgramDesc.WorkGraph.Flags &= ~D3D12_SET_WORK_GRAPH_FLAG_INITIALIZE;
+}
+
+void WorkGraphsDXR::CopyRasterOutputToWorkGraphInput()
+{
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
+
+	DX12::GraphicsCmdList->CopyResource(m_workGraphOutput.Get(), m_swapChain.BackBuffer());
+
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
+
 }
 
 void WorkGraphsDXR::CopyWorkGraphOutputToBackBuffer()
@@ -482,7 +498,7 @@ void WorkGraphsDXR::LoadComputeAssets()
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
 			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_computeOutput)));
 
-
+		m_computeOutput->SetName(L"Compute Output");
 		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 0, DX12::UAVDescriptorSize);
 		//m_raytracingOutputResourceUAVDescriptorHeapIndex = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, descriptorIndexToUse, m_computeDescriptorSize);
 		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
@@ -640,7 +656,7 @@ void WorkGraphsDXR::DoRaster()
 		if (mesh.materialIdx != 1 && mesh.materialIdx != 3)
 		{
 			DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
-			CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx, DX12::UAVDescriptorSize);
+			CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx + 1, DX12::UAVDescriptorSize);
 			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, hDescriptor);
 
 			D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
@@ -661,7 +677,7 @@ void WorkGraphsDXR::DoRaster()
 		if (mesh.materialIdx == 1  || mesh.materialIdx == 3)
 		{
 			DX12::GraphicsCmdList->SetPipelineState(m_transparentPipelineState.Get());
-			CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx, DX12::UAVDescriptorSize);
+			CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx + 1, DX12::UAVDescriptorSize);
 			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, hDescriptor);
 
 			D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
