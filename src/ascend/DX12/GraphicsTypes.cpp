@@ -246,7 +246,7 @@ void DepthStencilBuffer::Create(const std::wstring& name, uint32_t width, uint32
 #include "DDSTextureLoader12.h"
 Texture::Texture(int index, std::wstring filename)
 {
-    CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), index + 1, DX12::UAVDescriptorSize);
+    CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), index + 2, DX12::UAVDescriptorSize);
     std::unique_ptr<uint8_t[]> ddsData;
     std::vector<D3D12_SUBRESOURCE_DATA> subresources;
     VERIFYD3D12RESULT(LoadDDSTextureFromFile(DX12::Device.Get(), filename.c_str(), Resource.ReleaseAndGetAddressOf(), ddsData, subresources));

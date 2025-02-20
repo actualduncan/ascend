@@ -29,7 +29,7 @@ inline RayDesc GenerateCameraRay(uint2 index, in float3 cameraPosition, in float
 }
 float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
 {
-    float3 pixelToLight = normalize(float3(10,10,10) - hitPosition);
+    float3 pixelToLight = normalize(float3(-10,40,10) - hitPosition);
 
     // Diffuse contribution.
     float fNDotL = max(0.0f, dot(pixelToLight, normal));
@@ -37,6 +37,7 @@ float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
     return float4(0.7, 0.7, 0.7, 1) * float4(1, 1, 0.7, 1) * fNDotL;
 }
 RWTexture2D<float4> RenderTarget : register(u0);
+RWTexture2D<float4> Normals : register(u1);
 RaytracingAccelerationStructure Scene : register(t0, space0);
 
 [Shader("node")]
@@ -59,7 +60,7 @@ void EntryFunction(uint3 DTid : SV_DispatchThreadID)
     if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
         float3 rayhit = ray.Origin + (ray.Direction * rayQuery.CommittedRayT());
-        float3 normal = RenderTarget[DTid.xy].xyz;
+        float3 normal = Normals[DTid.xy].xyz;
         if(rayhit.x < 0)
         {
 

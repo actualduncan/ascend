@@ -29,7 +29,8 @@ private:
 	DepthStencilBuffer m_depthStencilBuffer;
 	ComPtr<ID3D12Resource> m_indexBuffer;
 	ComPtr<ID3D12Resource> m_vertexBuffer;
-
+	ComPtr<ID3D12Resource> m_normalTex;
+	ComPtr<ID3D12Resource> m_normalTexRTV;
 	ConstantBuffer m_rayTraceConstantBuffer;
 	RayTraceConstants m_constantBufferData;
 
