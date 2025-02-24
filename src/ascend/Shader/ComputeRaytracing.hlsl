@@ -1,5 +1,6 @@
 cbuffer RayTraceConstants : register(b0)
 {
+
     float4x4 ViewProjection;
     float4x4 InvViewProjection;
     float4 CameraPosWS;
@@ -27,14 +28,22 @@ inline RayDesc GenerateCameraRay(uint2 index, in float3 cameraPosition, in float
 }
 float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
 {
-    float3 pixelToLight = normalize(float3(10, 10, 10) - hitPosition);
+    float3 pixelToLight = normalize(float3(-10, 40, 10) - hitPosition);
 
     // Diffuse contribution.
-    float fNDotL = max(0.0f, dot(pixelToLight, normal));
+    float fNDotL = abs(dot(pixelToLight, normal));
 
     return float4(0.7, 0.7, 0.7, 1) * float4(1, 1, 0.7, 1) * fNDotL;
 }
+float4 calculateLighting(float3 lightDirection, float3 normal, float4 diffuse)
+{
+    float intensity = saturate(dot(normal, lightDirection));
+    float4 colour = saturate(diffuse * intensity);
+    return colour;
+}
+
 RWTexture2D<float4> RenderTarget : register(u0);
+RWTexture2D<float4> Normals : register(u1);
 RaytracingAccelerationStructure Scene : register(t0, space0);
 
 [numthreads(1, 1, 1)]
@@ -53,7 +62,7 @@ void CSMain(uint3 DTid : SV_DispatchThreadID)
     if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
         float3 rayhit = ray.Origin + (ray.Direction * rayQuery.CommittedRayT());
-        float3 normal = RenderTarget[DTid.xy].xyz;
+        float3 normal = Normals[DTid.xy].xyz;
         if (rayhit.x < 0)
         {
 
@@ -63,7 +72,7 @@ void CSMain(uint3 DTid : SV_DispatchThreadID)
 
         }
 
-        RenderTarget[DTid.xy] *= CalculateDiffuseLighting(rayhit, normal);
+        RenderTarget[DTid.xy] = calculateLighting(normalize(float3(-10, 40, -10) - rayhit), normal, RenderTarget[DTid.xy]);
 
 
     }

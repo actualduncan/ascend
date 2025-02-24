@@ -83,6 +83,7 @@ private:
 	void LoadComputeAssets();
 	void DoCompute();
 	void CopyComputeOutputToBackBuffer();
+	void CopyRasterOutputToComputeInput();
 	ComPtr<ID3D12RootSignature> m_computeRootSignature;
 	ComPtr<ID3D12PipelineState> m_computePipelineState;
 	ComPtr<ID3D12Resource> m_computeOutput;
