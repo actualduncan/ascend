@@ -55,7 +55,7 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_depthStencilBuffer.Create(L"ZBuffer", m_width, m_height);
 	m_rayTraceConstantBuffer.Create(L"Constant Buffer", sizeof(RayTraceConstants));
 
-	if (true)
+	if (false)
 	{
 		LoadRasterAssets();
 		CreateWorkGraphRootSignature();
@@ -63,7 +63,7 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	}
 	else
 	{
-
+		LoadRasterAssets();
 		LoadComputeAssets();
 	}
 
@@ -84,34 +84,58 @@ void WorkGraphsDXR::LoadModels()
 	// make better texture manager for sponza
 	m_sponza = std::make_unique<Model>("debug/res/sponza.obj");
 	
-	textures.push_back(std::make_unique<Texture>(0, L"debug/res/textures/sponza_column_b_bump.dds"));
-	textures.push_back(std::make_unique<Texture>(1, L"debug/res/textures/sponza_thorn_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(3, L"debug/res/textures/vase_plant.dds"));
-	textures.push_back(std::make_unique<Texture>(2, L"debug/res/textures/vase_round.dds"));
-	textures.push_back(std::make_unique<Texture>(4, L"debug/res/textures/background.dds"));
-	textures.push_back(std::make_unique<Texture>(5, L"debug/res/textures/spnza_bricks_a_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(6, L"debug/res/textures/sponza_arch_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(7, L"debug/res/textures/sponza_ceiling_a_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(8, L"debug/res/textures/sponza_column_a_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(9, L"debug/res/textures/sponza_floor_a_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(10, L"debug/res/textures/sponza_column_c_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(11, L"debug/res/textures/sponza_details_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(12, L"debug/res/textures/sponza_column_b_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(13, L"debug/res/textures/sponza_column_b_bump.dds"));
-	textures.push_back(std::make_unique<Texture>(14, L"debug/res/textures/sponza_flagpole_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(15, L"debug/res/textures/sponza_fabric_green_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(16, L"debug/res/textures/sponza_fabric_blue_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(17, L"debug/res/textures/sponza_fabric_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(18, L"debug/res/textures/sponza_curtain_blue_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(19, L"debug/res/textures/sponza_curtain_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(20, L"debug/res/textures/sponza_curtain_green_diff.dds"));
-	textures.push_back(std::make_unique<Texture>(21, L"debug/res/textures/chain_texture.dds"));
-	textures.push_back(std::make_unique<Texture>(22, L"debug/res/textures/vase_hanging.dds"));
-	textures.push_back(std::make_unique<Texture>(23, L"debug/res/textures/vase_dif.dds"));
-	textures.push_back(std::make_unique<Texture>(24, L"debug/res/textures/lion.dds"));
-	textures.push_back(std::make_unique<Texture>(25, L"debug/res/textures/sponza_roof_diff.dds"));
+	textures.push_back(std::make_unique<Texture>(0, L"debug/res/textures/empty.dds"));
+	textures.push_back(std::make_unique<Texture>(1, L"debug/res/textures/Sponza_Thorn_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(3, L"debug/res/textures/VasePlant_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(2, L"debug/res/textures/VaseRound_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(4, L"debug/res/textures/Background_Albedo.dds"));
+	textures.push_back(std::make_unique<Texture>(5, L"debug/res/textures/Sponza_Bricks_a_Albedo.dds"));
+	textures.push_back(std::make_unique<Texture>(6, L"debug/res/textures/Sponza_Arch_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(7, L"debug/res/textures/Sponza_Ceiling_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(8, L"debug/res/textures/Sponza_Column_a_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(9, L"debug/res/textures/Sponza_Floor_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(10, L"debug/res/textures/Sponza_Column_c_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(11, L"debug/res/textures/Sponza_Details_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(12, L"debug/res/textures/Sponza_Column_b_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(13, L"debug/res/textures/empty.dds"));
+	textures.push_back(std::make_unique<Texture>(14, L"debug/res/textures/Sponza_FlagPole_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(15, L"debug/res/textures/Sponza_Fabric_Green_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(16, L"debug/res/textures/Sponza_Fabric_Blue_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(17, L"debug/res/textures/Sponza_Fabric_Red_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(18, L"debug/res/textures/Sponza_Curtain_Blue_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(19, L"debug/res/textures/Sponza_Curtain_Green_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(20, L"debug/res/textures/Sponza_Curtain_Red_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(21, L"debug/res/textures/ChainTexture_Albedo.dds"));
+	textures.push_back(std::make_unique<Texture>(22, L"debug/res/textures/VaseHanging_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(23, L"debug/res/textures/Vase_diffuse.dds"));
+	textures.push_back(std::make_unique<Texture>(24, L"debug/res/textures/Lion_Albedo.dds"));
+	textures.push_back(std::make_unique<Texture>(25, L"debug/res/textures/Sponza_Roof_diffuse.dds"));
 	
-
+	textures.push_back(std::make_unique<Texture>(1+25, L"debug/res/textures/Sponza_Thorn_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(3+25, L"debug/res/textures/VasePlant_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(2+25, L"debug/res/textures/VaseRound_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(4+25, L"debug/res/textures/Background_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(5+25, L"debug/res/textures/Sponza_Bricks_a_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(6+25, L"debug/res/textures/Sponza_Arch_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(7+25, L"debug/res/textures/Sponza_Ceiling_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(8+25, L"debug/res/textures/Sponza_Column_a_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(9+25, L"debug/res/textures/Sponza_Floor_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(10+25, L"debug/res/textures/Sponza_Column_c_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(11+25, L"debug/res/textures/Sponza_Details_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(12+25, L"debug/res/textures/Sponza_Column_b_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(13+25, L"debug/res/textures/empty.dds"));
+	textures.push_back(std::make_unique<Texture>(14+25, L"debug/res/textures/Sponza_FlagPole_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(15+25, L"debug/res/textures/Sponza_Fabric_Green_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(16+25, L"debug/res/textures/Sponza_Fabric_Blue_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(17+25, L"debug/res/textures/Sponza_Fabric_Red_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(18+25, L"debug/res/textures/Sponza_Curtain_Blue_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(19+25, L"debug/res/textures/Sponza_Curtain_Green_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(20+25, L"debug/res/textures/Sponza_Curtain_Red_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(21+25, L"debug/res/textures/ChainTexture_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(22+25, L"debug/res/textures/VaseHanging_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(23+25, L"debug/res/textures/Vase_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(24+25, L"debug/res/textures/Lion_Normal.dds"));
+	textures.push_back(std::make_unique<Texture>(25+25, L"debug/res/textures/Sponza_Roof_Normal.dds"));
 }
 
 void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
@@ -145,7 +169,7 @@ void WorkGraphsDXR::Render()
 		BuildAccelerationStructuresForCompute();
 	}
 
-	if (true)
+	if (false)
 	{
 		DoRaster();
 		CopyRasterOutputToWorkGraphInput();
@@ -154,7 +178,8 @@ void WorkGraphsDXR::Render()
 	}
 	else
 	{
-
+		DoRaster();
+		CopyRasterOutputToComputeInput();
 		DoCompute();
 		CopyComputeOutputToBackBuffer();
 	}
@@ -269,9 +294,9 @@ void WorkGraphsDXR::CreateWorkGraphRootSignature()
 		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
 			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_workGraphOutput)));
-
+		auto uavDesc2 = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
-			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
 
 		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 0, DX12::UAVDescriptorSize);
 		//m_raytracingOutputResourceUAVDescriptorHeapIndex = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, descriptorIndexToUse, m_computeDescriptorSize);
@@ -332,6 +357,22 @@ void WorkGraphsDXR::CopyRasterOutputToWorkGraphInput()
 	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_normalTexRTV.Get());
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
+
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
+
+}
+
+void WorkGraphsDXR::CopyRasterOutputToComputeInput()
+{
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
+	DX12::GraphicsCmdList->CopyResource(m_computeOutput.Get(), m_swapChain.BackBuffer());
+	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_normalTexRTV.Get());
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
 
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
@@ -476,13 +517,14 @@ void WorkGraphsDXR::BuildAccelerationStructuresForCompute()
 void WorkGraphsDXR::LoadComputeAssets()
 {
 	{
-		CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
-		UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-		CD3DX12_ROOT_PARAMETER rootParameters[3];
-		rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
-		rootParameters[1].InitAsShaderResourceView(0);
-		rootParameters[2].InitAsConstantBufferView(0);
-
+		CD3DX12_DESCRIPTOR_RANGE UAVDescriptor[2];
+		UAVDescriptor[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+		UAVDescriptor[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
+		CD3DX12_ROOT_PARAMETER rootParameters[4];
+		rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor[0]);
+		rootParameters[1].InitAsDescriptorTable(1, &UAVDescriptor[1]);
+		rootParameters[2].InitAsShaderResourceView(0);
+		rootParameters[3].InitAsConstantBufferView(0);
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
 
@@ -513,6 +555,9 @@ void WorkGraphsDXR::LoadComputeAssets()
 		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
 			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_computeOutput)));
+		auto uavDesc2 = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
 
 		m_computeOutput->SetName(L"Compute Output");
 		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 0, DX12::UAVDescriptorSize);
@@ -521,6 +566,10 @@ void WorkGraphsDXR::LoadComputeAssets()
 		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 		DX12::Device->CreateUnorderedAccessView(m_computeOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
 		m_computeOutputUavDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
+		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle2 = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 1, DX12::UAVDescriptorSize);
+		//m_raytracingOutputResourceUAVDescriptorHeapIndex = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, descriptorIndexToUse, m_computeDescriptorSize);
+
+		DX12::Device->CreateUnorderedAccessView(m_normalTex.Get(), nullptr, &UAVDesc, uavDescriptorHandle2);
 
 	}
 }
@@ -532,6 +581,8 @@ void WorkGraphsDXR::DoCompute()
 	DX12::GraphicsCmdList->SetDescriptorHeaps(1, DX12::UAVDescriptorHeap.GetAddressOf());
 	DX12::GraphicsCmdList->SetComputeRootSignature(m_computeRootSignature.Get());
 	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_computeOutputUavDescriptorHandle);
+	CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), 1, DX12::UAVDescriptorSize);
+	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::NormSlot, hDescriptor);
 	DX12::GraphicsCmdList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
 	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
 	DX12::GraphicsCmdList->Dispatch(m_width, m_height, 1);
@@ -554,10 +605,11 @@ void WorkGraphsDXR::LoadRasterAssets()
 	{
 		CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
 		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
-
-		CD3DX12_ROOT_PARAMETER1 rootParameters[2];
+		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+		CD3DX12_ROOT_PARAMETER1 rootParameters[3];
 		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
-		rootParameters[1].InitAsConstantBufferView(0);
+		rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
+		rootParameters[2].InitAsConstantBufferView(0);
 
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
@@ -597,9 +649,11 @@ void WorkGraphsDXR::LoadRasterAssets()
 		{
 			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
 			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
-			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+			{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "BITTANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 48, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
 		};
-
+		
 		// Describe and create the graphics pipeline state object (PSO).
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
 		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
@@ -617,7 +671,7 @@ void WorkGraphsDXR::LoadRasterAssets()
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
 		psoDesc.NumRenderTargets = 2;
 		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
-		psoDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		psoDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_SNORM;
 		psoDesc.SampleDesc.Count = 1;
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPso = psoDesc;
@@ -642,7 +696,7 @@ void WorkGraphsDXR::LoadRasterAssets()
 		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_rasterPipelineState)));
 		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&transparentPso, IID_PPV_ARGS(&m_transparentPipelineState)));
 
-		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
 
 		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
@@ -651,7 +705,7 @@ void WorkGraphsDXR::LoadRasterAssets()
 
 		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
 		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
-		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_SNORM;
 		rtvDesc.Texture2D.MipSlice = 0;
 		rtvDesc.Texture2D.PlaneSlice = 0;
 
@@ -664,7 +718,7 @@ void WorkGraphsDXR::DoRaster()
 
 	DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
 	DX12::GraphicsCmdList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
-	DX12::GraphicsCmdList->SetGraphicsRootConstantBufferView(1, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
+	DX12::GraphicsCmdList->SetGraphicsRootConstantBufferView(2, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
 
 	DX12::GraphicsCmdList->RSSetViewports(1, &m_viewport);
 	DX12::GraphicsCmdList->RSSetScissorRects(1, &m_scissorRect);
@@ -692,7 +746,8 @@ void WorkGraphsDXR::DoRaster()
 			DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
 			CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx + 2, DX12::UAVDescriptorSize);
 			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, hDescriptor);
-
+			CD3DX12_GPU_DESCRIPTOR_HANDLE htDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx+25 + 2, DX12::UAVDescriptorSize);
+			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(1, htDescriptor);
 			D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
 			D3D12_INDEX_BUFFER_VIEW ibView = mesh.GetIndexBufferView();
 
@@ -713,7 +768,8 @@ void WorkGraphsDXR::DoRaster()
 			DX12::GraphicsCmdList->SetPipelineState(m_transparentPipelineState.Get());
 			CD3DX12_GPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx + 2, DX12::UAVDescriptorSize);
 			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, hDescriptor);
-
+			CD3DX12_GPU_DESCRIPTOR_HANDLE htDescriptor = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart(), mesh.materialIdx + 25 + 2, DX12::UAVDescriptorSize);
+			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(1, htDescriptor);
 			D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
 			D3D12_INDEX_BUFFER_VIEW ibView = mesh.GetIndexBufferView();
 

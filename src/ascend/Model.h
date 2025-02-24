@@ -12,6 +12,8 @@ typedef UINT16 Index;
 struct Vertex { 
 	XMFLOAT3 Position;
 	XMFLOAT3 Normal;
+	XMFLOAT3 Tangent;
+	XMFLOAT3 BitTangent;
 	XMFLOAT2 TexC;
 };
 

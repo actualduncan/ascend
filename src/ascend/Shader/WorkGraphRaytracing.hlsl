@@ -32,10 +32,11 @@ float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
     float3 pixelToLight = normalize(float3(-10,40,10) - hitPosition);
 
     // Diffuse contribution.
-    float fNDotL = max(0.0f, dot(pixelToLight, normal));
+    float fNDotL = max(0.0f, abs(dot(pixelToLight, normal)));
 
     return float4(0.7, 0.7, 0.7, 1) * float4(1, 1, 0.7, 1) * fNDotL;
 }
+
 RWTexture2D<float4> RenderTarget : register(u0);
 RWTexture2D<float4> Normals : register(u1);
 RaytracingAccelerationStructure Scene : register(t0, space0);

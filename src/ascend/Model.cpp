@@ -123,6 +123,14 @@ void Model::InitFromAssimpMesh(const aiMesh& assimpMesh, Vertex* dstVertices, In
 		vert.Normal.y = assimpMesh.mNormals[i].y;
 		vert.Normal.z = assimpMesh.mNormals[i].z;
 
+		vert.Tangent.x = assimpMesh.mTangents[i].x;
+		vert.Tangent.y = assimpMesh.mTangents[i].y;
+		vert.Tangent.z = assimpMesh.mTangents[i].z;
+
+		vert.BitTangent.x = assimpMesh.mBitangents[i].x;
+		vert.BitTangent.y = assimpMesh.mBitangents[i].y;
+		vert.BitTangent.z = assimpMesh.mBitangents[i].z;
+		
 		vert.TexC.x = assimpMesh.mTextureCoords[0][i].x;
 		vert.TexC.y = assimpMesh.mTextureCoords[0][i].y;
 

@@ -120,7 +120,7 @@ namespace DX12
 		RTVDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 
 		D3D12_DESCRIPTOR_HEAP_DESC UAVDescriptorHeapDesc = { };
-		UAVDescriptorHeapDesc.NumDescriptors = 30;
+		UAVDescriptorHeapDesc.NumDescriptors = 60;
 		UAVDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
 		UAVDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 		
