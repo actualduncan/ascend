@@ -29,7 +29,7 @@ inline RayDesc GenerateCameraRay(uint2 index, in float3 cameraPosition, in float
 }
 float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
 {
-    float3 pixelToLight = normalize(float3(-10,40,10) - hitPosition);
+    float3 pixelToLight = normalize(float3(0,600,0) - hitPosition);
 
     // Diffuse contribution.
     float fNDotL = max(0.0f, abs(dot(pixelToLight, normal)));

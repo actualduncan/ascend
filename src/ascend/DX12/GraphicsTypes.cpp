@@ -209,8 +209,9 @@ void ConstantBuffer::UpdateContents(void* data, size_t size)
     memcpy(BufferStartPtr, data, size);
 }
 
-void DepthStencilBuffer::Create(const std::wstring& name, uint32_t width, uint32_t height)
+void DepthStencilBuffer::Create(const std::wstring& name, DXGI_FORMAT format, uint32_t width, uint32_t height)
 {
+    m_format = format;
     D3D12_RESOURCE_DESC depthStencilDesc = {};
     depthStencilDesc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
     depthStencilDesc.Alignment = 0;
@@ -218,15 +219,15 @@ void DepthStencilBuffer::Create(const std::wstring& name, uint32_t width, uint32
     depthStencilDesc.Height = height;
     depthStencilDesc.DepthOrArraySize = 1;
     depthStencilDesc.MipLevels = 1;
-    depthStencilDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+    depthStencilDesc.Format = m_format;
     depthStencilDesc.SampleDesc.Count = 1;
     depthStencilDesc.SampleDesc.Quality = 0;
     depthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
     depthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
     D3D12_CLEAR_VALUE optClear = {};
-    optClear.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
-    optClear.DepthStencil.Depth = 1.0f;
+    optClear.Format = m_format;
+    optClear.DepthStencil.Depth = 0.0f;
     optClear.DepthStencil.Stencil = 0;
 
     // window size properties therefore should be in swapchain info? Or create depth buffer struct

@@ -52,10 +52,10 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height));
 	m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height));
 
-	m_depthStencilBuffer.Create(L"ZBuffer", m_width, m_height);
+	m_depthStencilBuffer.Create(L"ZBuffer", DXGI_FORMAT_D32_FLOAT_S8X24_UINT ,m_width, m_height);
 	m_rayTraceConstantBuffer.Create(L"Constant Buffer", sizeof(RayTraceConstants));
 
-	if (false)
+	if (true)
 	{
 		LoadRasterAssets();
 		CreateWorkGraphRootSignature();
@@ -169,7 +169,7 @@ void WorkGraphsDXR::Render()
 		BuildAccelerationStructuresForCompute();
 	}
 
-	if (false)
+	if (true)
 	{
 		DoRaster();
 		CopyRasterOutputToWorkGraphInput();
@@ -664,8 +664,8 @@ void WorkGraphsDXR::LoadRasterAssets()
 		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
 		psoDesc.DepthStencilState.DepthEnable = TRUE;
 		psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
-		psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
-		psoDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+		psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+		psoDesc.DSVFormat = m_depthStencilBuffer.GetFormat();
 		psoDesc.DepthStencilState.StencilEnable = FALSE;
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
@@ -677,7 +677,7 @@ void WorkGraphsDXR::LoadRasterAssets()
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPso = psoDesc;
 		transparentPso.DepthStencilState.DepthEnable = TRUE;
 		transparentPso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-		transparentPso.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_LESS;
+		transparentPso.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
 		transparentPso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
 
 		D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
@@ -698,9 +698,18 @@ void WorkGraphsDXR::LoadRasterAssets()
 
 		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
 
+		float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+		D3D12_CLEAR_VALUE optClear = {};
+		optClear.Color[0] = 0.0f;
+		optClear.Color[1] = 0.2f;
+		optClear.Color[2] = 0.4f;
+		optClear.Color[3] = 1.0f;
+
+		optClear.Format = DXGI_FORMAT_R8G8B8A8_SNORM;
+
 		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
-			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, nullptr, IID_PPV_ARGS(&m_normalTexRTV)));
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &optClear, IID_PPV_ARGS(&m_normalTexRTV)));
 
 
 		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
@@ -708,6 +717,7 @@ void WorkGraphsDXR::LoadRasterAssets()
 		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_SNORM;
 		rtvDesc.Texture2D.MipSlice = 0;
 		rtvDesc.Texture2D.PlaneSlice = 0;
+
 
 		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptor(DX12::RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 2, DX12::RTVDescriptorSize);
 		DX12::Device->CreateRenderTargetView(m_normalTexRTV.Get(), &rtvDesc, rtvDescriptor);
@@ -730,11 +740,11 @@ void WorkGraphsDXR::DoRaster()
 	CD3DX12_CPU_DESCRIPTOR_HANDLE dsvHandle(DX12::DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 0, DX12::DSVDescriptorSize);
 	DX12::GraphicsCmdList->OMSetRenderTargets(2, rtvHandles, FALSE, &dsvHandle);
 	DX12::GraphicsCmdList->OMSetStencilRef(1);
-	DX12::GraphicsCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 1.0f, 0, 0, NULL);
+	DX12::GraphicsCmdList->ClearDepthStencilView(dsvHandle, D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, NULL);
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[0], clearColor, 0, nullptr);
-
+	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[1], clearColor, 0, nullptr);
 	const uint64_t modelMeshCount = m_sponza->GetModelMeshVector().size();
 	for (int i = 0; i < modelMeshCount; ++i)
 	{

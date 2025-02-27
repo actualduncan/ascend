@@ -113,8 +113,13 @@ private:
 class DepthStencilBuffer : public Buffer
 {
 public:
+	
 	DepthStencilBuffer() {};
-	void Create(const std::wstring& name, uint32_t width, uint32_t height);
+
+	void Create(const std::wstring& name, DXGI_FORMAT format, uint32_t width, uint32_t height);
+	DXGI_FORMAT GetFormat() { return m_format; }
+private:
+	DXGI_FORMAT m_format;
 };
 
 //                                      Texture

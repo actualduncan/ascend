@@ -46,8 +46,8 @@ void Camera::WindowSizeChanged(float aspectRatio, float minZ, float maxZ)
 	m_projectionMatrix = XMMatrixPerspectiveFovRH(
 		fovAngleY,
 		aspectRatio,
-		minZ,
-		maxZ
+		maxZ,
+		minZ
 	);
 }
 
