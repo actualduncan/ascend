@@ -1,11 +1,13 @@
 cbuffer RayTraceConstants : register(b0)
 {
-
     float4x4 ViewProjection;
     float4x4 InvViewProjection;
     float4 CameraPosWS;
-    float2 yes[14];
+    float4 lightPos;
+    float2 yes[12];
 };
+
+
 
 inline RayDesc GenerateCameraRay(uint2 index, in float3 cameraPosition, in float4x4 projectionToWorld)
 {
@@ -28,18 +30,12 @@ inline RayDesc GenerateCameraRay(uint2 index, in float3 cameraPosition, in float
 }
 float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
 {
-    float3 pixelToLight = normalize(float3(-10, 40, 10) - hitPosition);
+    float3 pixelToLight = normalize(lightPos.xyz - hitPosition);
 
     // Diffuse contribution.
-    float fNDotL = abs(dot(pixelToLight, normal));
+    float fNDotL = max(0.0f, abs(dot(pixelToLight, normal)));
 
     return float4(0.7, 0.7, 0.7, 1) * float4(1, 1, 0.7, 1) * fNDotL;
-}
-float4 calculateLighting(float3 lightDirection, float3 normal, float4 diffuse)
-{
-    float intensity = saturate(dot(normal, lightDirection));
-    float4 colour = saturate(diffuse * intensity);
-    return colour;
 }
 
 RWTexture2D<float4> RenderTarget : register(u0);
@@ -55,7 +51,7 @@ void CSMain(uint3 DTid : SV_DispatchThreadID)
     ray.TMin = 0.01;
     ray.TMax = 10000;
     
-    RayQuery < RAY_FLAG_FORCE_OPAQUE || RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH > rayQuery;
+    RayQuery < RAY_FLAG_FORCE_OPAQUE > rayQuery;
     rayQuery.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
     rayQuery.Proceed();
    
@@ -63,23 +59,44 @@ void CSMain(uint3 DTid : SV_DispatchThreadID)
     {
         float3 rayhit = ray.Origin + (ray.Direction * rayQuery.CommittedRayT());
         float3 normal = Normals[DTid.xy].xyz;
-        if (rayhit.x < 0)
+
+        RayDesc shadowRay;
+        shadowRay.Origin = rayhit;
+        shadowRay.Direction = normalize(lightPos.xyz - rayhit);
+        shadowRay.TMin = 0.01;
+        shadowRay.TMax = 10000;
+        RayQuery < RAY_FLAG_FORCE_OPAQUE > ShadowRayQuery;
+        ShadowRayQuery.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, shadowRay);
+        ShadowRayQuery.Proceed();
+        if (ShadowRayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
         {
 
+            float3 shadowRayHit = shadowRay.Origin + (shadowRay.Direction * ShadowRayQuery.CommittedRayT());
+
+            float distance = length(shadowRay.Origin - shadowRayHit);
+            float maxDistance = length(shadowRay.Origin - lightPos.xyz);
+            if (distance > maxDistance)
+            {
+                RenderTarget[DTid.xy] *= CalculateDiffuseLighting(rayhit, normal);
+            }
+            else
+            {
+                RenderTarget[DTid.xy] = float4(0, 0, 0, 1.0);
+            }
+            
         }
         else
         {
-
+           
+            RenderTarget[DTid.xy] *= CalculateDiffuseLighting(rayhit, normal);
         }
-
-        RenderTarget[DTid.xy] = calculateLighting(normalize(float3(0, 600, 0) - rayhit), normal, RenderTarget[DTid.xy]);
-
-
     }
     else
     {
-        RenderTarget[DTid.xy] *= float4(0, 0, 0, 1.0);
+        RenderTarget[DTid.xy] = float4(135, 206, 235, 1.0);
     }
 
     GroupMemoryBarrierWithGroupSync();
+
 }
+

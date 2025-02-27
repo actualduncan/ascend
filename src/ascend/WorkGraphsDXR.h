@@ -8,7 +8,8 @@ struct RayTraceConstants
 	XMMATRIX ViewProjection;
 	XMMATRIX InvProjection;
 	XMFLOAT4 CameraPosWS;
-	XMFLOAT2 yes[14];
+	XMFLOAT4 LightPos;
+	XMFLOAT2 yes[12];
 };
 
 class WorkGraphsDXR

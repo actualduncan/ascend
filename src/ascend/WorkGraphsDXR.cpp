@@ -149,6 +149,7 @@ void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
 	m_constantBufferData.ViewProjection = XMMatrixTranspose( viewProj);
 	m_constantBufferData.InvProjection = XMMatrixTranspose(XMMatrixInverse(nullptr,viewProj));
 	m_constantBufferData.CameraPosWS = XMFLOAT4(m_camera->GetPosition().x, m_camera->GetPosition().y, m_camera->GetPosition().z, 1.0f);
+	m_constantBufferData.LightPos = XMFLOAT4(0, 50, 0, 1.0f);
 	m_rayTraceConstantBuffer.UpdateContents(&m_constantBufferData, sizeof(RayTraceConstants));
 
 	// imgui frame
