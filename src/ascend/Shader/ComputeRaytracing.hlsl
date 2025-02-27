@@ -55,7 +55,7 @@ void CSMain(uint3 DTid : SV_DispatchThreadID)
     ray.TMin = 0.01;
     ray.TMax = 10000;
     
-    RayQuery < RAY_FLAG_FORCE_OPAQUE > rayQuery;
+    RayQuery < RAY_FLAG_FORCE_OPAQUE || RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH > rayQuery;
     rayQuery.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
     rayQuery.Proceed();
    
@@ -72,7 +72,7 @@ void CSMain(uint3 DTid : SV_DispatchThreadID)
 
         }
 
-        RenderTarget[DTid.xy] = calculateLighting(normalize(float3(-10, 40, -10) - rayhit), normal, RenderTarget[DTid.xy]);
+        RenderTarget[DTid.xy] = calculateLighting(normalize(float3(0, 600, 0) - rayhit), normal, RenderTarget[DTid.xy]);
 
 
     }

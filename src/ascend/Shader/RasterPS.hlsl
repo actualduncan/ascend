@@ -28,9 +28,6 @@ float magnitude(float3 _vector)
 
 float3 recalculateNormals(float3 currentNormal, float3 bumpMap)
 {
-    float3 bumpNormal; // Sample the pixel in the bump map.
-   
-    
     // calculates each tangent based on forward/up vector and current normal
     float3 tangent1 = cross(currentNormal, float3(0, 0, 1)); // forward vector
     float3 tangent2 = cross(currentNormal, float3(0, 1, 0)); // up vector
@@ -64,12 +61,12 @@ Texture2D g_texture : register(t0);
 Texture2D g_normtexture : register(t1);
 SamplerState g_sampler : register(s0);
 
-PSOutput PSMain(PSInput input)
+PSOutput PSMain(PSInput input)  
 {
-    float3 bumpMap = g_normtexture.Sample(g_sampler, input.uv);
+    float4 bumpMap = g_normtexture.Sample(g_sampler, input.uv);
     PSOutput output;
     output.Color = g_texture.Sample(g_sampler, input.uv) * float4(1, 1, 1, 1); //Set first output
-    output.Normal = float4(recalculateNormals(input.normal.xyz, bumpMap), 1.0f); //Set second output
+    output.Normal = float4(recalculateNormals(input.normal.xyz, bumpMap.xyz), 1.0f); //Set second output
 
     return output;
 }
