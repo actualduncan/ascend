@@ -252,11 +252,15 @@ void DescriptorHeap::Init(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE he
     ShaderVisible = shaderVisible;
 
     if(heapType == D3D12_DESCRIPTOR_HEAP_TYPE_RTV || heapType == D3D12_DESCRIPTOR_HEAP_TYPE_DSV)
-    {
         ShaderVisible = false;
-    }
 
     NumHeaps = ShaderVisible ? DX12::RenderLatency : 1;
+
+    DeadList.Init(NumDescriptors);
+    for(uint32_t i = 0; i < NumDescriptors; ++i)
+    {
+        DeadList[i] = uint32_t(i);
+    }
 
     D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
     heapDesc.NumDescriptors = NumDescriptors;
@@ -270,7 +274,6 @@ void DescriptorHeap::Init(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE he
         if(ShaderVisible)
             GPUStart[i] = Heaps[i]->GetGPUDescriptorForHeapStart();
     }
-
     DescriptorSize = DX12::Device->GetDescriptorHandleIncrementSize(HeapType);
 
 }
@@ -287,4 +290,21 @@ D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::GPUHandleFromIndex(uint32 descriptor
     D3D12_GPU_DESCRIPTOR_HANDLE handle = GPUStart[heapIdx];
     handle.ptr += descriptorIdx * DescriptorSize;
     return handle;
+}
+
+DescriptorAllocation DescriptorHeap::AllocateDescriptor()
+{
+    // DXR Path tracer makes use of SRWLockExclusive??
+    // maybe uses a render thread for commands?? an allocations?? - pretty feasible that it does this to be fair.
+    uint32_t idx = DeadList[AllocatedDescriptors];
+    ++AllocatedDescriptors;
+
+    DescriptorAllocation alloc;
+    alloc.Index = idx;
+
+
+    alloc.Handle = CPUStart;
+    alloc.Handle.ptr += idx * DescriptorSize;
+
+    return alloc;
 }
