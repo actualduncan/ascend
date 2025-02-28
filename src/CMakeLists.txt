@@ -49,6 +49,8 @@ set(SOURCES ascend/main.cpp
 			ascend/DX12/PCH.h
 			ascend/DX12/DDSTextureLoader12.cpp
 			ascend/DX12/DDSTextureLoader12.h
+			ascend/DX12/Textures.cpp
+			ascend/DX12/Textures.h
 			ascend/imgui/imconfig.h
 			ascend/imgui/imgui.cpp
 			ascend/imgui/imgui.h

@@ -8,6 +8,34 @@
 
 using namespace DirectX;
 
+enum class MaterialTextures
+{
+	ALBEDO = 0,
+	NORMAL,
+
+	COUNT
+}
+
+struct MaterialTexture
+{
+    std::wstring Name;
+    Texture Texture;
+};
+
+struct Material
+{
+	std::string Name;
+	std::wstring TextureNames[uint64_t(MaterialTextures::COUNT)];
+	const Texture* Textures[uint64_t(MaterialTextuers::COUNT)] = {};
+
+	// Used to grab the specific texture type needed. 
+	Texture Texture(MaterialTextures textureType)
+	{
+		return Textures[uint64_t(textureType)];
+	}
+
+}
+
 typedef UINT16 Index;
 struct Vertex { 
 	XMFLOAT3 Position;
@@ -29,6 +57,7 @@ struct Mesh
 
 	D3D12_GPU_VIRTUAL_ADDRESS vertexBufferAddress;
 	D3D12_GPU_VIRTUAL_ADDRESS indexBufferAddress;
+
 	int materialIdx;
 };
 
@@ -42,12 +71,14 @@ public:
 	D3D12_VERTEX_BUFFER_VIEW GetVertexBuffer();
 	D3D12_INDEX_BUFFER_VIEW GetIndexBuffer();
 private:
-	void ImportModel(const std::string& pFile);
+	void ImportModel(const std::string& file, const std::string& textureDirectory);
+	void LoadTextures(const std::string& fileDirectory)
 	void InitFromAssimpMesh(const aiMesh& assimpMesh, Vertex* dstVertices, Index* dstIndices);
 	void CreateBuffers();
 
 	std::vector<Mesh> m_modelMeshes;
-
+	std::vector<Texture> m_modelMaterials;
+	std::vector<MaterialTexture*> m_materialTextures; 
 	ComPtr<ID3D12Resource> m_vertexBuffer;
 	ComPtr<ID3D12Resource> m_indexBuffer;
 

@@ -126,7 +126,6 @@ private:
 //----------------------------------------------------------------------------------------------
 struct Texture
 {
-	Texture(int index, std::wstring filename);
 	std::string Name;
 	std::wstring Filename;
 

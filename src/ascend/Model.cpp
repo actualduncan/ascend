@@ -1,6 +1,7 @@
 #include "Model.h"
 #include "DX12/DX12.h"
 #include "DX12/DX12_Helpers.h"
+#include "DX12/Textures.h"
 
 D3D12_VERTEX_BUFFER_VIEW Mesh::GetVertexBufferView()
 {
@@ -32,11 +33,11 @@ Model::~Model()
 
 }
 
-void Model::ImportModel(const std::string& pFile)
+void Model::ImportModel(const std::string& file, const std::string& textureDirectory)
 {
 	Assimp::Importer importer;
 
-	const aiScene* scene = importer.ReadFile(pFile,
+	const aiScene* scene = importer.ReadFile(file,
 		aiProcess_CalcTangentSpace |
 		aiProcess_Triangulate |
 		aiProcess_JoinIdenticalVertices |
@@ -77,6 +78,99 @@ void Model::ImportModel(const std::string& pFile)
 
 		CreateBuffers();	
 	}
+
+	const uint64_t numMaterials = scene->mNumMaterials;
+	m_modelMaterials.Init(numMaterials);
+
+	for(uint64_t i = 0; i < numMaterials; ++i)
+	{
+		Material& material = m_modelMaterials[i];
+		const aiMaterial& mat = *scene->mMaterials[i];
+
+// read model material file names and find associated textures to link
+		aiString matName;
+		mat.Get(AI_MATKEY_NAME, matName);
+		material.Name = matName.C_Str();
+
+		aiString diffuseTexturePath;
+		aiString normalMapPath;
+		if(mat.GetTexture(aiTextureType_DIFFUSE, 0, &diffuseTexturePath) == aiReturn_SUCCESS)
+		{
+			// std::wstring diffusePath;
+			// diffusePath = LPCTSTR(diffuseTexturePath.C_Str());
+			material.TextureNames[uint64_t(MaterialTextures::ALBEDO)] = LPCTSTR(diffuseTexturePath.C_Str());
+		}
+
+		if(mat.GetTexture(aiTextureType_NORMALS, 0, &normalMapPath) == aiReturn_SUCCESS)
+		{
+			// std::wstring normalPath;
+			// normalPath = LPCTSTR(normalMapPath.C_Str());
+			material.TextureNames[uint64_t(MaterialTextures::NORMAL)] = LPCTSTR(normalMapPath.C_Str());
+		}
+		
+	}
+	LoadTextures(textureDirectory);
+}
+
+void Model::LoadTextures(const std::string& fileDirectory)
+{
+	// LoadTextures probably some issues with c_str and wstring stuff 
+	// have fun future duncan :)
+	const uint64_t numMaterials = m_modelMaterials.Size();
+
+	for(uint64_t matIdx = 0; matIdx < numMaterials; ++matIdx)
+	{
+		Material& material = m_modelMaterials[matIdx];
+		for(uint64_t texType = 0 ; texType < MaterialTextures::COUNT; ++texType)
+		{
+			material.Textures[texType] = nullptr;
+
+			std::wstring path = LPCTSTR(fileDirectory.c_str()) + material.TextureNames[texType];
+			if(material.TextureNames[texType].length == 0)
+			{
+				path = L"debug/res/textures/empty.dds";
+			}
+
+			// Check if this texture has already been loaded.
+			const uint64_t numLoaded = m_materialTextures.size();
+			for(uint64_t i = 0; i < numLoaded; ++i)
+			{
+				if(materialtextures[i]->Name == path)
+				{
+					material.Textures[texType] = &materialTextures[i]->Texture;
+					break;
+				}
+			}
+
+			if(material.Textures[texType] == nullptr)
+			{
+				MaterialTexture* newMatTexture = new MaterialTexture();
+				newMatTexture->Name = path;
+				LoadTextureFromFile(newMatTexture->Texture, path.c_str());
+				material.Textures[texType] = &newMatTexture;
+				uint64_t idx = m_materialTextures.push_back(newMatTexture);
+			}
+		}
+	}
+	/*
+	Some notes on what happens 
+	iterate through each material ->
+	iterate through each materialTexture ->
+	set wstring variable ot keep track of texture name + path
+	if file doesn't exist/isn't set make default texture
+	
+	check if materialtexture has been intialised
+	- Create new texture
+	- Set name ot the path of hte texture
+	Load texture function 
+	- selects to load by DDS extension creates texture as a placed resource and outputs to referenced texture
+	- uploades texture (similar ot GraphicsTypes.h Texture class constructor <- use this but with a default constructor ideally.)
+	set id to material textures.add return (vector iterator after push_back)
+	set texture for as a reference ot this new texture created
+	set Texture index to types idx
+
+	
+	*/
 }
 
 void Model::CreateBuffers()
