@@ -128,7 +128,7 @@ struct Texture
 {
 	std::string Name;
 	std::wstring Filename;
-
+	uint32_t ResourceIdx = 0;
 	ComPtr<ID3D12Resource> Resource = nullptr;
 	ComPtr<ID3D12Resource> UploadHeap = nullptr;
 };

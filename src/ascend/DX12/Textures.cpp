@@ -40,8 +40,9 @@ void LoadTextureFromFile(Texture& texture, const wchar_t* filePath)
     srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
     srvDesc.Texture2D.MipLevels = texture.Resource->GetDesc().MipLevels;
     srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-
-    DX12::Device->CreateShaderResourceView(texture.Resource.Get(), &srvDesc, hDescriptor);
+    DescriptorAllocation alloc = UAVDescriptorHeap.AllocateDescriptor();
+    texuture.ResourceIdx = alloc.Index;
+    DX12::Device->CreateShaderResourceView(texture.Resource.Get(), &srvDesc, alloc.Handle);
    
     
 }
