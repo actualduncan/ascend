@@ -132,3 +132,26 @@ struct Texture
 	ComPtr<ID3D12Resource> Resource = nullptr;
 	ComPtr<ID3D12Resource> UploadHeap = nullptr;
 };
+
+struct DescriptorHeap
+{
+	ComPtr<ID3D12DescriptorHeap> Heaps[DX12::RenderLatency] = {};
+	uint32_t NumDescriptors = 0;
+	uint32_t NumHeaps = 0;
+	uint32_t DescriptorSize = 0;
+	D3D12_CPU_DESCRIPTOR_HEAP CPUStart[DX12::RenderLatency];
+	D3D12_GPU_DESCRIPTOR_HEAP GPUStart[DX12::RenderLatency];
+
+	D3D12_DESCRIPTOR_HEAP_TYPE HeapType = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+	bool ShaderVisible = false ;
+
+	~DescriptorHeap();
+	void Init(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE heapType, bool shaderVisible);
+
+	D3D12_CPU_DESCRIPTOR_HANDLE CPUHandleFromIndex(uint32_t descriptorIdx) const;
+	D3D12_GPU_DESCRIPTOR_HANDLE GPUHandleFromIndex(uint32_t descriptorIdx) const;
+
+	D3D12_CPU_DESCRIPTOR_HANDLE CPUHandleFromIndex(uint32 descriptorIdx, uint64 heapIdx) const;
+    D3D12_GPU_DESCRIPTOR_HANDLE GPUHandleFromIndex(uint32 descriptorIdx, uint64 heapIdx) const;
+	
+}

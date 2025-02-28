@@ -244,3 +244,47 @@ void DepthStencilBuffer::Create(const std::wstring& name, DXGI_FORMAT format, ui
 
     DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE, 0);
 }
+
+void DescriptorHeap::Init(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE heapType, bool shaderVisible)
+{
+    NumDescriptors = numDescriptors;
+    HeapType = heapType;
+    ShaderVisible = shaderVisible;
+
+    if(heapType == D3D12_DESCRIPTOR_HEAP_TYPE_RTV || heapType == D3D12_DESCRIPTOR_HEAP_TYPE_DSV)
+    {
+        ShaderVisible = false;
+    }
+
+    NumHeaps = ShaderVisible ? DX12::RenderLatency : 1;
+
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+    heapDesc.NumDescriptors = NumDescriptors;
+    heapDesc.Type = HeapType;
+    heapDesc.Flags = ShaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+    for(uint32_t i = 0; i < NumHeaps; ++i)
+    {
+        VERIFYD3D12RESULT(DX12::Device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&Heaps[i])));
+        CPUStart = Heaps[i]->GetCPUDescriptorForHeapStart();
+        if(ShaderVisible)
+            GPUStart[i] = Heaps[i]->GetGPUDescriptorForHeapStart();
+    }
+
+    DescriptorSize = DX12::Device->GetDescriptorHandleIncrementSize(HeapType);
+
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE DescriptorHeap::CPUHandleFromIndex(uint32 descriptorIdx, uint64 heapIdx) const
+{
+    D3D12_CPU_DESCRIPTOR_HANDLE handle = CPUStart[heapIdx];
+    handle.ptr += descriptorIdx * DescriptorSize;
+    return handle;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::GPUHandleFromIndex(uint32 descriptorIdx, uint64 heapIdx) const
+{
+    D3D12_GPU_DESCRIPTOR_HANDLE handle = GPUStart[heapIdx];
+    handle.ptr += descriptorIdx * DescriptorSize;
+    return handle;
+}
