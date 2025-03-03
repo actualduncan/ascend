@@ -33,10 +33,11 @@ namespace DX12
 
 	UINT RTVDescriptorSize = 0;
 	UINT UAVDescriptorSize = 0;
+	UINT DSVDescriptorSize = 0;
 
-	ComPtr<ID3D12DescriptorHeap> RTVDescriptorHeap = nullptr;
-	ComPtr<ID3D12DescriptorHeap> UAVDescriptorHeap = nullptr;
-
+	DescriptorHeap RTVDescriptorHeap;
+	DescriptorHeap UAVDescriptorHeap;
+	DescriptorHeap DSVDescriptorHeap;
 
 	void Initialize(D3D_FEATURE_LEVEL minFeatureLevel)
 	{
@@ -111,26 +112,17 @@ namespace DX12
 		FrameFence.Init(0);
 
 		// Create Descriptors
-		D3D12_DESCRIPTOR_HEAP_DESC RTVDescriptorHeapDesc = { };
-		RTVDescriptorHeapDesc.NumDescriptors = RenderLatency;
-		RTVDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-		
-		VERIFYD3D12RESULT(Device->CreateDescriptorHeap(&RTVDescriptorHeapDesc, IID_PPV_ARGS(&RTVDescriptorHeap)));
-		RTVDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
+		RTVDescriptorHeap.Init(3, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, false);
+		UAVDescriptorHeap.Init(60, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true);
+		DSVDescriptorHeap.Init(RenderLatency, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, false);
 
-		D3D12_DESCRIPTOR_HEAP_DESC UAVDescriptorHeapDesc = { };
-		UAVDescriptorHeapDesc.NumDescriptors = RenderLatency;
-		UAVDescriptorHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
-		UAVDescriptorHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-		
-		VERIFYD3D12RESULT(Device->CreateDescriptorHeap(&UAVDescriptorHeapDesc, IID_PPV_ARGS(&UAVDescriptorHeap)));
-		UAVDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
+		RTVDescriptorSize = RTVDescriptorHeap.DescriptorSize;
 
 	}
 
 	void StartFrame()
 	{
-		GraphicsCmdList->SetDescriptorHeaps(1, UAVDescriptorHeap.GetAddressOf());
+		GraphicsCmdList->SetDescriptorHeaps(1, UAVDescriptorHeap.Heap.GetAddressOf());
 	}
 
 	void EndFrame(IDXGISwapChain4* swapChain)
@@ -202,9 +194,8 @@ namespace DX12
 		cmdList->ResourceBarrier(1, &barrier);
 	}
 
-	void Reset()
+	void Shutdown()
 	{
-		//VERIFYD3D12RESULT(GraphicsCmdList->Reset(GraphicsCmdAllocators[CurrentFrameIdx].Get(), nullptr));
-		//VERIFYD3D12RESULT(ComputeCmdList->Reset(GraphicsCmdAllocators[CurrentFrameIdx].Get(), nullptr));
+
 	}
 }

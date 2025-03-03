@@ -8,6 +8,8 @@
 using namespace Microsoft::WRL;
 using namespace DirectX;
 
+struct DescriptorHeap;
+
 namespace DX12 
 {
 
@@ -21,9 +23,12 @@ namespace DX12
 
 	extern UINT RTVDescriptorSize;
 	extern UINT UAVDescriptorSize;
+	extern UINT DSVDescriptorSize;
 
-	extern ComPtr<ID3D12DescriptorHeap> RTVDescriptorHeap;
-	extern ComPtr<ID3D12DescriptorHeap> UAVDescriptorHeap;
+	extern DescriptorHeap RTVDescriptorHeap;
+	extern DescriptorHeap UAVDescriptorHeap;
+	extern DescriptorHeap DSVDescriptorHeap;
+
 	// for syncro
 	extern UINT64 CurrentCPUFrame;  
 	extern UINT64 CurrentGPUFrame;  
@@ -41,6 +46,6 @@ namespace DX12
 
 	void TransitionResource(ID3D12GraphicsCommandList* cmdList, ID3D12Resource* resource, D3D12_RESOURCE_STATES before, D3D12_RESOURCE_STATES after, uint32_t subResource);
 
-	void Reset();
+	void Shutdown();
 
 }

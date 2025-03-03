@@ -1,19 +1,10 @@
-//*********************************************************
-//
-// Copyright (c) Microsoft. All rights reserved.
-// This code is licensed under the MIT License (MIT).
-// THIS CODE IS PROVIDED *AS IS* WITHOUT WARRANTY OF
-// ANY KIND, EITHER EXPRESS OR IMPLIED, INCLUDING ANY
-// IMPLIED WARRANTIES OF FITNESS FOR A PARTICULAR
-// PURPOSE, MERCHANTABILITY, OR NON-INFRINGEMENT.
-//
-//*********************************************************
 cbuffer RayTraceConstants : register(b0)
 {
-    //XMFLOAT4X4 InvViewProjection;
+    float4x4 ViewProjection;
     float4x4 InvViewProjection;
     float4 CameraPosWS;
-    float2 yes[22];
+    float4 lightPos;
+    float2 yes[12];
 };
 
 
@@ -37,11 +28,18 @@ inline RayDesc GenerateCameraRay(uint2 index, in float3 cameraPosition, in float
 
     return ray;
 }
+float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
+{
+    float3 pixelToLight = normalize(lightPos.xyz - hitPosition);
 
-#ifndef COMPUTERAYTRACING_HLSL
-#define COMPUTERAYTRACING_HLSL
+    // Diffuse contribution.
+    float fNDotL = max(0.0f, abs(dot(pixelToLight, normal)));
+
+    return float4(0.7, 0.7, 0.7, 1) * float4(1, 1, 0.7, 1) * fNDotL;
+}
 
 RWTexture2D<float4> RenderTarget : register(u0);
+RWTexture2D<float4> Normals : register(u1);
 RaytracingAccelerationStructure Scene : register(t0, space0);
 
 [numthreads(1, 1, 1)]
@@ -53,24 +51,52 @@ void CSMain(uint3 DTid : SV_DispatchThreadID)
     ray.TMin = 0.01;
     ray.TMax = 10000;
     
-    RayQuery < RAY_FLAG_CULL_NON_OPAQUE |
-             RAY_FLAG_SKIP_PROCEDURAL_PRIMITIVES |
-             RAY_FLAG_ACCEPT_FIRST_HIT_AND_END_SEARCH > rayQuery;
+    RayQuery < RAY_FLAG_FORCE_OPAQUE > rayQuery;
     rayQuery.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, ray);
     rayQuery.Proceed();
    
     if (rayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
     {
-        
-        RenderTarget[DTid.xy] = float4(1.0, 0, 0, 1.0);
+        float3 rayhit = ray.Origin + (ray.Direction * rayQuery.CommittedRayT());
+        float3 normal = Normals[DTid.xy].xyz;
+
+        RayDesc shadowRay;
+        shadowRay.Origin = rayhit;
+        shadowRay.Direction = normalize(lightPos.xyz - rayhit);
+        shadowRay.TMin = 0.01;
+        shadowRay.TMax = 10000;
+        RayQuery < RAY_FLAG_FORCE_OPAQUE > ShadowRayQuery;
+        ShadowRayQuery.TraceRayInline(Scene, RAY_FLAG_NONE, 0xFF, shadowRay);
+        ShadowRayQuery.Proceed();
+        if (ShadowRayQuery.CommittedStatus() == COMMITTED_TRIANGLE_HIT)
+        {
+
+            float3 shadowRayHit = shadowRay.Origin + (shadowRay.Direction * ShadowRayQuery.CommittedRayT());
+
+            float distance = length(shadowRay.Origin - shadowRayHit);
+            float maxDistance = length(shadowRay.Origin - lightPos.xyz);
+            if (distance > maxDistance)
+            {
+                RenderTarget[DTid.xy] *= CalculateDiffuseLighting(rayhit, normal);
+            }
+            else
+            {
+                RenderTarget[DTid.xy] = float4(0, 0, 0, 1.0);
+            }
+            
+        }
+        else
+        {
+           
+            RenderTarget[DTid.xy] *= CalculateDiffuseLighting(rayhit, normal);
+        }
     }
     else
     {
-        RenderTarget[DTid.xy] = float4(0, 0, 0, 1.0);
-
+        RenderTarget[DTid.xy] = float4(135, 206, 235, 1.0);
     }
 
     GroupMemoryBarrierWithGroupSync();
+
 }
 
-#endif // COMPUTERAYTRACING_HLSL

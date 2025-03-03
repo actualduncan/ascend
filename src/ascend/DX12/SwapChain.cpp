@@ -1,7 +1,7 @@
 #include "SwapChain.h"
 #include "DX12.h"
 #include "DX12_Helpers.h"
-
+#include "GraphicsTypes.h"
 SwapChain::SwapChain()
 {
 
@@ -60,8 +60,8 @@ void SwapChain::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 		rtvDesc.Texture2D.MipSlice = 0;
 		rtvDesc.Texture2D.PlaneSlice = 0;
 
-		CD3DX12_CPU_DESCRIPTOR_HANDLE rtvDescriptor(DX12::RTVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), i, DX12::RTVDescriptorSize);
-		DX12::Device->CreateRenderTargetView(m_backBufferRT[i].Get(), &rtvDesc, rtvDescriptor);
+		DescriptorAllocation alloc = DX12::RTVDescriptorHeap.AllocateDescriptor();
+		DX12::Device->CreateRenderTargetView(m_backBufferRT[i].Get(), &rtvDesc, alloc.Handle);
 	}
 
 	m_backBufferIdx = m_swapChain->GetCurrentBackBufferIndex();
