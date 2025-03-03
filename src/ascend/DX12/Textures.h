@@ -1,4 +1,4 @@
 #include "DX12.h"
 #include "GraphicsTypes.h"
 
-void LoadTexture(Texture& texture, const wchar_t* filepath);
+void LoadTextureFromFile(Texture& texture, const wchar_t* filepath);

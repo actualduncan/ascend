@@ -14,27 +14,27 @@ enum class MaterialTextures
 	NORMAL,
 
 	COUNT
-}
+};
 
 struct MaterialTexture
 {
-    std::wstring Name;
+    std::string Name;
     Texture Texture;
 };
 
 struct Material
 {
 	std::string Name;
-	std::wstring TextureNames[uint64_t(MaterialTextures::COUNT)];
-	const Texture* Textures[uint64_t(MaterialTextuers::COUNT)] = {};
+	std::string TextureNames[uint64_t(MaterialTextures::COUNT)];
+	const MaterialTexture* Textures[uint64_t(MaterialTextures::COUNT)] = {};
 
 	// Used to grab the specific texture type needed. 
-	Texture Texture(MaterialTextures textureType)
+	const MaterialTexture* Texture(MaterialTextures textureType)
 	{
 		return Textures[uint64_t(textureType)];
 	}
 
-}
+};
 
 typedef UINT16 Index;
 struct Vertex { 
@@ -64,20 +64,21 @@ struct Mesh
 class Model
 {
 public:
-    Model(const std::string& file);
+    Model(const std::string& file, const std::string& textureDirectory);
     ~Model();
 
 	std::vector<Mesh>& GetModelMeshVector() { return m_modelMeshes; };
 	D3D12_VERTEX_BUFFER_VIEW GetVertexBuffer();
 	D3D12_INDEX_BUFFER_VIEW GetIndexBuffer();
+		std::vector<Material> m_modelMaterials;
 private:
 	void ImportModel(const std::string& file, const std::string& textureDirectory);
-	void LoadTextures(const std::string& fileDirectory)
+	void LoadTextures(const std::string& fileDirectory);
 	void InitFromAssimpMesh(const aiMesh& assimpMesh, Vertex* dstVertices, Index* dstIndices);
 	void CreateBuffers();
 
 	std::vector<Mesh> m_modelMeshes;
-	std::vector<Texture> m_modelMaterials;
+	
 	std::vector<MaterialTexture*> m_materialTextures; 
 	ComPtr<ID3D12Resource> m_vertexBuffer;
 	ComPtr<ID3D12Resource> m_indexBuffer;

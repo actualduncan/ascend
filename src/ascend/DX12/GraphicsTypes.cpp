@@ -198,7 +198,11 @@ void ConstantBuffer::Create(const std::wstring& name, size_t bufferSize)
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
     cbvDesc.BufferLocation = m_resource->GetGPUVirtualAddress();
     cbvDesc.SizeInBytes = m_bufferSize;
-    DX12::Device->CreateConstantBufferView(&cbvDesc, DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+
+    DescriptorAllocation alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
+    resourceIdx = alloc.Index;
+
+    DX12::Device->CreateConstantBufferView(&cbvDesc, alloc.Handle);
     m_gpuVirtualAddress = m_resource->GetGPUVirtualAddress();
 
     BufferStartPtr = Map();
@@ -240,7 +244,10 @@ void DepthStencilBuffer::Create(const std::wstring& name, DXGI_FORMAT format, ui
         &optClear,
         IID_PPV_ARGS(&m_resource)));
     m_resource->SetName(name.c_str());
-    DX12::Device->CreateDepthStencilView(m_resource.Get(), nullptr, DX12::DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+
+    DescriptorAllocation alloc = DX12::DSVDescriptorHeap.AllocateDescriptor();
+    resourceIdx = alloc.Index;
+    DX12::Device->CreateDepthStencilView(m_resource.Get(), nullptr, alloc.Handle);
 
     DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE, 0);
 }
@@ -256,7 +263,7 @@ void DescriptorHeap::Init(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE he
 
     NumHeaps = ShaderVisible ? DX12::RenderLatency : 1;
 
-    DeadList.Init(NumDescriptors);
+    DeadList = std::vector<uint32_t>(NumDescriptors);
     for(uint32_t i = 0; i < NumDescriptors; ++i)
     {
         DeadList[i] = uint32_t(i);
@@ -267,27 +274,24 @@ void DescriptorHeap::Init(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE he
     heapDesc.Type = HeapType;
     heapDesc.Flags = ShaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
-    for(uint32_t i = 0; i < NumHeaps; ++i)
-    {
-        VERIFYD3D12RESULT(DX12::Device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&Heaps[i])));
-        CPUStart = Heaps[i]->GetCPUDescriptorForHeapStart();
-        if(ShaderVisible)
-            GPUStart[i] = Heaps[i]->GetGPUDescriptorForHeapStart();
-    }
+    VERIFYD3D12RESULT(DX12::Device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&Heap)));
+    CPUStart = Heap->GetCPUDescriptorHandleForHeapStart();
+    if (ShaderVisible)
+        GPUStart = Heap->GetGPUDescriptorHandleForHeapStart();
     DescriptorSize = DX12::Device->GetDescriptorHandleIncrementSize(HeapType);
 
 }
 
-D3D12_CPU_DESCRIPTOR_HANDLE DescriptorHeap::CPUHandleFromIndex(uint32 descriptorIdx, uint64 heapIdx) const
+D3D12_CPU_DESCRIPTOR_HANDLE DescriptorHeap::CPUHandleFromIndex(uint32_t descriptorIdx, uint32_t heapIdx) const
 {
-    D3D12_CPU_DESCRIPTOR_HANDLE handle = CPUStart[heapIdx];
+    D3D12_CPU_DESCRIPTOR_HANDLE handle = CPUStart;
     handle.ptr += descriptorIdx * DescriptorSize;
     return handle;
 }
 
-D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::GPUHandleFromIndex(uint32 descriptorIdx, uint64 heapIdx) const
+D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::GPUHandleFromIndex(uint32_t descriptorIdx, uint32_t heapIdx) const
 {
-    D3D12_GPU_DESCRIPTOR_HANDLE handle = GPUStart[heapIdx];
+    D3D12_GPU_DESCRIPTOR_HANDLE handle = GPUStart;
     handle.ptr += descriptorIdx * DescriptorSize;
     return handle;
 }
@@ -305,6 +309,7 @@ DescriptorAllocation DescriptorHeap::AllocateDescriptor()
 
     alloc.Handle = CPUStart;
     alloc.Handle.ptr += idx * DescriptorSize;
-
+    alloc.GPUHandle = GPUStart;
+    alloc.GPUHandle.ptr += idx * DescriptorSize;
     return alloc;
 }

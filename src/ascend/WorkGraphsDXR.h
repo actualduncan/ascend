@@ -48,6 +48,8 @@ private:
 	D3D12_SET_PROGRAM_DESC    m_workGraphProgramDesc = {};
 	std::uint32_t             m_workGraphEntryPointIndex;
 	D3D12_GPU_DESCRIPTOR_HANDLE m_workGraphOutputUavDescriptorHandle;
+	D3D12_GPU_DESCRIPTOR_HANDLE m_normHandle;
+	D3D12_CPU_DESCRIPTOR_HANDLE m_normRTVHandle;
 	UINT m_workGraphOutputUavDescriptorIndex;
 	UINT m_workGraphDescriptorSize;
 

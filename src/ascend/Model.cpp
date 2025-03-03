@@ -23,9 +23,9 @@ D3D12_INDEX_BUFFER_VIEW Mesh::GetIndexBufferView()
 	return ibView;
 }
 
-Model::Model(const std::string& file)
+Model::Model(const std::string& file, const std::string& textureDirectory)
 {
-	ImportModel(file);
+	ImportModel(file, textureDirectory);
 }
 
 Model::~Model()
@@ -80,7 +80,7 @@ void Model::ImportModel(const std::string& file, const std::string& textureDirec
 	}
 
 	const uint64_t numMaterials = scene->mNumMaterials;
-	m_modelMaterials.Init(numMaterials);
+	m_modelMaterials = std::vector<Material>(numMaterials);
 
 	for(uint64_t i = 0; i < numMaterials; ++i)
 	{
@@ -98,46 +98,52 @@ void Model::ImportModel(const std::string& file, const std::string& textureDirec
 		{
 			// std::wstring diffusePath;
 			// diffusePath = LPCTSTR(diffuseTexturePath.C_Str());
-			material.TextureNames[uint64_t(MaterialTextures::ALBEDO)] = LPCTSTR(diffuseTexturePath.C_Str());
+			material.TextureNames[uint64_t(MaterialTextures::ALBEDO)] = std::string(diffuseTexturePath.C_Str());
 		}
 
 		if(mat.GetTexture(aiTextureType_NORMALS, 0, &normalMapPath) == aiReturn_SUCCESS)
 		{
 			// std::wstring normalPath;
 			// normalPath = LPCTSTR(normalMapPath.C_Str());
-			material.TextureNames[uint64_t(MaterialTextures::NORMAL)] = LPCTSTR(normalMapPath.C_Str());
+			material.TextureNames[uint64_t(MaterialTextures::NORMAL)] = std::string(normalMapPath.C_Str());
 		}
 		
 	}
 	LoadTextures(textureDirectory);
 }
-
+std::wstring s2ws(const std::string& str)
+{
+	int size_needed = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
+	std::wstring wstrTo(size_needed, 0);
+	MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstrTo[0], size_needed);
+	return wstrTo;
+}
 void Model::LoadTextures(const std::string& fileDirectory)
 {
 	// LoadTextures probably some issues with c_str and wstring stuff 
 	// have fun future duncan :)
-	const uint64_t numMaterials = m_modelMaterials.Size();
+	const uint64_t numMaterials = m_modelMaterials.size();
 
 	for(uint64_t matIdx = 0; matIdx < numMaterials; ++matIdx)
 	{
 		Material& material = m_modelMaterials[matIdx];
-		for(uint64_t texType = 0 ; texType < MaterialTextures::COUNT; ++texType)
+		for(uint64_t texType = 0 ; texType < uint64_t(MaterialTextures::COUNT); ++texType)
 		{
 			material.Textures[texType] = nullptr;
 
-			std::wstring path = LPCTSTR(fileDirectory.c_str()) + material.TextureNames[texType];
-			if(material.TextureNames[texType].length == 0)
+			std::string path = fileDirectory + material.TextureNames[texType];
+			if(material.TextureNames[texType].size() == 0)
 			{
-				path = L"debug/res/textures/empty.dds";
+				path = "debug/res/textures/empty.dds";
 			}
 
 			// Check if this texture has already been loaded.
 			const uint64_t numLoaded = m_materialTextures.size();
 			for(uint64_t i = 0; i < numLoaded; ++i)
 			{
-				if(materialtextures[i]->Name == path)
+				if(m_materialTextures[i]->Name == path)
 				{
-					material.Textures[texType] = &materialTextures[i]->Texture;
+					material.Textures[texType] = m_materialTextures[i];
 					break;
 				}
 			}
@@ -146,9 +152,11 @@ void Model::LoadTextures(const std::string& fileDirectory)
 			{
 				MaterialTexture* newMatTexture = new MaterialTexture();
 				newMatTexture->Name = path;
-				LoadTextureFromFile(newMatTexture->Texture, path.c_str());
-				material.Textures[texType] = &newMatTexture;
-				uint64_t idx = m_materialTextures.push_back(newMatTexture);
+				std::replace(path.begin(), path.end(), '\\', '/');
+				LoadTextureFromFile(newMatTexture->Texture, s2ws(path).c_str());
+				material.Textures[texType] = newMatTexture;
+				m_materialTextures.push_back(newMatTexture);
+				//uint64_t idx = m_materialTextures.size();
 			}
 		}
 	}

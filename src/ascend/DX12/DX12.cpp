@@ -122,7 +122,7 @@ namespace DX12
 
 	void StartFrame()
 	{
-		GraphicsCmdList->SetDescriptorHeaps(1, UAVDescriptorHeap.GetAddressOf());
+		GraphicsCmdList->SetDescriptorHeaps(1, UAVDescriptorHeap.Heap.GetAddressOf());
 	}
 
 	void EndFrame(IDXGISwapChain4* swapChain)

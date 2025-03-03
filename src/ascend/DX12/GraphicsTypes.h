@@ -105,7 +105,7 @@ public:
 
 	void Create(const std::wstring& name, size_t BufferSize);
 	void UpdateContents(void* data, size_t size);
-
+	uint32_t resourceIdx;
 private:
 	void* BufferStartPtr = nullptr;
 };
@@ -118,6 +118,7 @@ public:
 
 	void Create(const std::wstring& name, DXGI_FORMAT format, uint32_t width, uint32_t height);
 	DXGI_FORMAT GetFormat() { return m_format; }
+	uint32_t resourceIdx;
 private:
 	DXGI_FORMAT m_format;
 };
@@ -137,8 +138,9 @@ struct Texture
 struct DescriptorAllocation
 {
 	D3D12_CPU_DESCRIPTOR_HANDLE Handle;
+	D3D12_GPU_DESCRIPTOR_HANDLE GPUHandle;
 	uint32_t Index = uint32_t(0);
-}
+};
 
 struct DescriptorHeap
 {
@@ -147,22 +149,22 @@ struct DescriptorHeap
 	uint32_t NumHeaps = 0;
 	uint32_t DescriptorSize = 0;
 	uint32_t AllocatedDescriptors = 0;
-	std::Vector<uint32_t> DeadList;
+	std::vector<uint32_t> DeadList;
 
-	D3D12_CPU_DESCRIPTOR_HEAP CPUStart;
-	D3D12_GPU_DESCRIPTOR_HEAP GPUStart;
+	D3D12_CPU_DESCRIPTOR_HANDLE CPUStart;
+	D3D12_GPU_DESCRIPTOR_HANDLE GPUStart;
 
 	D3D12_DESCRIPTOR_HEAP_TYPE HeapType = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
-	bool ShaderVisible = false ;
+	bool ShaderVisible = false;
 
-	~DescriptorHeap();
+	~DescriptorHeap() {};
 	void Init(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE heapType, bool shaderVisible);
 	DescriptorAllocation AllocateDescriptor();
 
-	D3D12_CPU_DESCRIPTOR_HANDLE CPUHandleFromIndex(uint32_t descriptorIdx) const;
-	D3D12_GPU_DESCRIPTOR_HANDLE GPUHandleFromIndex(uint32_t descriptorIdx) const;
+	//D3D12_CPU_DESCRIPTOR_HANDLE CPUHandleFromIndex(uint32_t descriptorIdx) const;
+	//D3D12_GPU_DESCRIPTOR_HANDLE GPUHandleFromIndex(uint32_t descriptorIdx) const;
 
-	D3D12_CPU_DESCRIPTOR_HANDLE CPUHandleFromIndex(uint32 descriptorIdx, uint64 heapIdx) const;
-    D3D12_GPU_DESCRIPTOR_HANDLE GPUHandleFromIndex(uint32 descriptorIdx, uint64 heapIdx) const;
+	D3D12_CPU_DESCRIPTOR_HANDLE CPUHandleFromIndex(uint32_t descriptorIdx, uint32_t heapIdx) const;
+	D3D12_GPU_DESCRIPTOR_HANDLE GPUHandleFromIndex(uint32_t descriptorIdx, uint32_t heapIdx) const;
 
-}
+};
