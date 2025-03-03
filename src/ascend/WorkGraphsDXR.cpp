@@ -76,68 +76,9 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	LoadModels();
 }
 
-// why is this floating about
-std::vector<std::unique_ptr<Texture>> textures;
-D3D12_GPU_DESCRIPTOR_HANDLE texhandle;
 void WorkGraphsDXR::LoadModels()
 {
-	// make better texture manager for sponza
 	m_sponza = std::make_unique<Model>("debug/res/sponza.obj", "debug/res/textures/");
-	
-	/*
-	textures.push_back(std::make_unique<Texture>(0, L"debug/res/textures/empty.dds"));
-	textures.push_back(std::make_unique<Texture>(1, L"debug/res/textures/Sponza_Thorn_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(3, L"debug/res/textures/VasePlant_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(2, L"debug/res/textures/VaseRound_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(4, L"debug/res/textures/Background_Albedo.dds"));
-	textures.push_back(std::make_unique<Texture>(5, L"debug/res/textures/Sponza_Bricks_a_Albedo.dds"));
-	textures.push_back(std::make_unique<Texture>(6, L"debug/res/textures/Sponza_Arch_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(7, L"debug/res/textures/Sponza_Ceiling_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(8, L"debug/res/textures/Sponza_Column_a_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(9, L"debug/res/textures/Sponza_Floor_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(10, L"debug/res/textures/Sponza_Column_c_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(11, L"debug/res/textures/Sponza_Details_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(12, L"debug/res/textures/Sponza_Column_b_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(13, L"debug/res/textures/empty.dds"));
-	textures.push_back(std::make_unique<Texture>(14, L"debug/res/textures/Sponza_FlagPole_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(15, L"debug/res/textures/Sponza_Fabric_Green_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(16, L"debug/res/textures/Sponza_Fabric_Blue_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(17, L"debug/res/textures/Sponza_Fabric_Red_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(18, L"debug/res/textures/Sponza_Curtain_Blue_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(19, L"debug/res/textures/Sponza_Curtain_Green_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(20, L"debug/res/textures/Sponza_Curtain_Red_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(21, L"debug/res/textures/ChainTexture_Albedo.dds"));
-	textures.push_back(std::make_unique<Texture>(22, L"debug/res/textures/VaseHanging_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(23, L"debug/res/textures/Vase_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(24, L"debug/res/textures/Lion_Albedo.dds"));
-	textures.push_back(std::make_unique<Texture>(25, L"debug/res/textures/Sponza_Roof_diffuse.dds"));
-	
-	textures.push_back(std::make_unique<Texture>(1+25, L"debug/res/textures/Sponza_Thorn_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(3+25, L"debug/res/textures/VasePlant_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(2+25, L"debug/res/textures/VaseRound_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(4+25, L"debug/res/textures/Background_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(5+25, L"debug/res/textures/Sponza_Bricks_a_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(6+25, L"debug/res/textures/Sponza_Arch_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(7+25, L"debug/res/textures/Sponza_Ceiling_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(8+25, L"debug/res/textures/Sponza_Column_a_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(9+25, L"debug/res/textures/Sponza_Floor_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(10+25, L"debug/res/textures/Sponza_Column_c_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(11+25, L"debug/res/textures/Sponza_Details_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(12+25, L"debug/res/textures/Sponza_Column_b_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(13+25, L"debug/res/textures/empty.dds"));
-	textures.push_back(std::make_unique<Texture>(14+25, L"debug/res/textures/Sponza_FlagPole_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(15+25, L"debug/res/textures/Sponza_Fabric_Green_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(16+25, L"debug/res/textures/Sponza_Fabric_Blue_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(17+25, L"debug/res/textures/Sponza_Fabric_Red_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(18+25, L"debug/res/textures/Sponza_Curtain_Blue_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(19+25, L"debug/res/textures/Sponza_Curtain_Green_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(20+25, L"debug/res/textures/Sponza_Curtain_Red_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(21+25, L"debug/res/textures/ChainTexture_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(22+25, L"debug/res/textures/VaseHanging_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(23+25, L"debug/res/textures/Vase_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(24+25, L"debug/res/textures/Lion_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(25+25, L"debug/res/textures/Sponza_Roof_Normal.dds"));
-	*/
 }
 
 void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
@@ -297,23 +238,12 @@ void WorkGraphsDXR::CreateWorkGraphRootSignature()
 		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
 			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_workGraphOutput)));
-		auto uavDesc2 = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
-			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
-
 		
 		DescriptorAllocation alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
 		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
 		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 		DX12::Device->CreateUnorderedAccessView(m_workGraphOutput.Get(), nullptr, &UAVDesc, alloc.Handle);
 		m_workGraphOutputUavDescriptorHandle = alloc.GPUHandle;
-
-		
-		alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
-		UAVDesc = {};
-		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-		DX12::Device->CreateUnorderedAccessView(m_normalTex.Get(), nullptr, &UAVDesc, alloc.Handle);
-		m_normHandle = alloc.GPUHandle;
 	}
 }
 
@@ -550,17 +480,13 @@ void WorkGraphsDXR::LoadComputeAssets()
 		NAME_D3D12_OBJECT(m_computePipelineState);
 	}
 
-
-
 	{
 		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
 		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
 			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_computeOutput)));
-		auto uavDesc2 = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
-			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
+
 
 		m_computeOutput->SetName(L"Compute Output");
 		DescriptorAllocation alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
@@ -570,20 +496,12 @@ void WorkGraphsDXR::LoadComputeAssets()
 		DX12::Device->CreateUnorderedAccessView(m_computeOutput.Get(), nullptr, &UAVDesc, alloc.Handle);
 		
 		m_computeOutputUavDescriptorHandle = alloc.GPUHandle;
-
-		alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
-
-		DX12::Device->CreateUnorderedAccessView(m_normalTex.Get(), nullptr, &UAVDesc, alloc.Handle);
-
-		m_normHandle = alloc.GPUHandle;
-
 	}
 }
 
 void WorkGraphsDXR::DoCompute()
 {
 	DX12::GraphicsCmdList->SetPipelineState(m_computePipelineState.Get());
-	//D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
 	DX12::GraphicsCmdList->SetDescriptorHeaps(1, DX12::UAVDescriptorHeap.Heap.GetAddressOf());
 	DX12::GraphicsCmdList->SetComputeRootSignature(m_computeRootSignature.Get());
 	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_computeOutputUavDescriptorHandle);
@@ -723,15 +641,23 @@ void WorkGraphsDXR::LoadRasterAssets()
 		rtvDesc.Texture2D.MipSlice = 0;
 		rtvDesc.Texture2D.PlaneSlice = 0;
 
-
 		DescriptorAllocation alloc = DX12::RTVDescriptorHeap.AllocateDescriptor();
 		DX12::Device->CreateRenderTargetView(m_normalTexRTV.Get(), &rtvDesc, alloc.Handle);
 		m_normRTVHandle = alloc.Handle;
+
+		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
+
+		alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
+		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
+		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		DX12::Device->CreateUnorderedAccessView(m_normalTex.Get(), nullptr, &UAVDesc, alloc.Handle);
+		m_normHandle = alloc.GPUHandle;
 	}
 }
 void WorkGraphsDXR::DoRaster()
 {
-
 	DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
 	DX12::GraphicsCmdList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
 	DX12::GraphicsCmdList->SetGraphicsRootConstantBufferView(2, m_rayTraceConstantBuffer.GetGpuVirtualAddress());

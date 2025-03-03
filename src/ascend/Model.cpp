@@ -87,7 +87,7 @@ void Model::ImportModel(const std::string& file, const std::string& textureDirec
 		Material& material = m_modelMaterials[i];
 		const aiMaterial& mat = *scene->mMaterials[i];
 
-// read model material file names and find associated textures to link
+
 		aiString matName;
 		mat.Get(AI_MATKEY_NAME, matName);
 		material.Name = matName.C_Str();
@@ -96,32 +96,20 @@ void Model::ImportModel(const std::string& file, const std::string& textureDirec
 		aiString normalMapPath;
 		if(mat.GetTexture(aiTextureType_DIFFUSE, 0, &diffuseTexturePath) == aiReturn_SUCCESS)
 		{
-			// std::wstring diffusePath;
-			// diffusePath = LPCTSTR(diffuseTexturePath.C_Str());
 			material.TextureNames[uint64_t(MaterialTextures::ALBEDO)] = std::string(diffuseTexturePath.C_Str());
 		}
 
 		if(mat.GetTexture(aiTextureType_NORMALS, 0, &normalMapPath) == aiReturn_SUCCESS)
 		{
-			// std::wstring normalPath;
-			// normalPath = LPCTSTR(normalMapPath.C_Str());
 			material.TextureNames[uint64_t(MaterialTextures::NORMAL)] = std::string(normalMapPath.C_Str());
 		}
 		
 	}
 	LoadTextures(textureDirectory);
 }
-std::wstring s2ws(const std::string& str)
-{
-	int size_needed = MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), NULL, 0);
-	std::wstring wstrTo(size_needed, 0);
-	MultiByteToWideChar(CP_UTF8, 0, &str[0], (int)str.size(), &wstrTo[0], size_needed);
-	return wstrTo;
-}
+
 void Model::LoadTextures(const std::string& fileDirectory)
 {
-	// LoadTextures probably some issues with c_str and wstring stuff 
-	// have fun future duncan :)
 	const uint64_t numMaterials = m_modelMaterials.size();
 
 	for(uint64_t matIdx = 0; matIdx < numMaterials; ++matIdx)
@@ -156,29 +144,9 @@ void Model::LoadTextures(const std::string& fileDirectory)
 				LoadTextureFromFile(newMatTexture->Texture, s2ws(path).c_str());
 				material.Textures[texType] = newMatTexture;
 				m_materialTextures.push_back(newMatTexture);
-				//uint64_t idx = m_materialTextures.size();
 			}
 		}
 	}
-	/*
-	Some notes on what happens 
-	iterate through each material ->
-	iterate through each materialTexture ->
-	set wstring variable ot keep track of texture name + path
-	if file doesn't exist/isn't set make default texture
-	
-	check if materialtexture has been intialised
-	- Create new texture
-	- Set name ot the path of hte texture
-	Load texture function 
-	- selects to load by DDS extension creates texture as a placed resource and outputs to referenced texture
-	- uploades texture (similar ot GraphicsTypes.h Texture class constructor <- use this but with a default constructor ideally.)
-	set id to material textures.add return (vector iterator after push_back)
-	set texture for as a reference ot this new texture created
-	set Texture index to types idx
-
-	
-	*/
 }
 
 void Model::CreateBuffers()
