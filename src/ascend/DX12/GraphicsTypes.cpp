@@ -198,7 +198,11 @@ void ConstantBuffer::Create(const std::wstring& name, size_t bufferSize)
     D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
     cbvDesc.BufferLocation = m_resource->GetGPUVirtualAddress();
     cbvDesc.SizeInBytes = m_bufferSize;
-    DX12::Device->CreateConstantBufferView(&cbvDesc, DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+
+    DescriptorAllocation alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
+    resourceIdx = alloc.Index;
+
+    DX12::Device->CreateConstantBufferView(&cbvDesc, alloc.Handle);
     m_gpuVirtualAddress = m_resource->GetGPUVirtualAddress();
 
     BufferStartPtr = Map();
@@ -240,51 +244,72 @@ void DepthStencilBuffer::Create(const std::wstring& name, DXGI_FORMAT format, ui
         &optClear,
         IID_PPV_ARGS(&m_resource)));
     m_resource->SetName(name.c_str());
-    DX12::Device->CreateDepthStencilView(m_resource.Get(), nullptr, DX12::DSVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
+
+    DescriptorAllocation alloc = DX12::DSVDescriptorHeap.AllocateDescriptor();
+    resourceIdx = alloc.Index;
+    DX12::Device->CreateDepthStencilView(m_resource.Get(), nullptr, alloc.Handle);
 
     DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_resource.Get(), D3D12_RESOURCE_STATE_COMMON, D3D12_RESOURCE_STATE_DEPTH_WRITE, 0);
 }
-#include "DDSTextureLoader12.h"
-Texture::Texture(int index, std::wstring filename)
+
+void DescriptorHeap::Init(uint32_t numDescriptors, D3D12_DESCRIPTOR_HEAP_TYPE heapType, bool shaderVisible)
 {
-    CD3DX12_CPU_DESCRIPTOR_HANDLE hDescriptor = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), index + 2, DX12::UAVDescriptorSize);
-    std::unique_ptr<uint8_t[]> ddsData;
-    std::vector<D3D12_SUBRESOURCE_DATA> subresources;
-    VERIFYD3D12RESULT(LoadDDSTextureFromFile(DX12::Device.Get(), filename.c_str(), Resource.ReleaseAndGetAddressOf(), ddsData, subresources));
+    NumDescriptors = numDescriptors;
+    HeapType = heapType;
+    ShaderVisible = shaderVisible;
 
-    const UINT64 uploadBufferSize = GetRequiredIntermediateSize(Resource.Get(), 0,
-        static_cast<UINT>(subresources.size()));
+    if(heapType == D3D12_DESCRIPTOR_HEAP_TYPE_RTV || heapType == D3D12_DESCRIPTOR_HEAP_TYPE_DSV)
+        ShaderVisible = false;
 
-    // Create the GPU upload buffer.
-    CD3DX12_HEAP_PROPERTIES heapProps(D3D12_HEAP_TYPE_UPLOAD);
+    NumHeaps = ShaderVisible ? DX12::RenderLatency : 1;
 
-    auto desc = CD3DX12_RESOURCE_DESC::Buffer(uploadBufferSize);
+    DeadList = std::vector<uint32_t>(NumDescriptors);
+    for(uint32_t i = 0; i < NumDescriptors; ++i)
+    {
+        DeadList[i] = uint32_t(i);
+    }
+
+    D3D12_DESCRIPTOR_HEAP_DESC heapDesc = {};
+    heapDesc.NumDescriptors = NumDescriptors;
+    heapDesc.Type = HeapType;
+    heapDesc.Flags = ShaderVisible ? D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE : D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+
+    VERIFYD3D12RESULT(DX12::Device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&Heap)));
+    CPUStart = Heap->GetCPUDescriptorHandleForHeapStart();
+    if (ShaderVisible)
+        GPUStart = Heap->GetGPUDescriptorHandleForHeapStart();
+    DescriptorSize = DX12::Device->GetDescriptorHandleIncrementSize(HeapType);
+
+}
+
+D3D12_CPU_DESCRIPTOR_HANDLE DescriptorHeap::CPUHandleFromIndex(uint32_t descriptorIdx, uint32_t heapIdx) const
+{
+    D3D12_CPU_DESCRIPTOR_HANDLE handle = CPUStart;
+    handle.ptr += descriptorIdx * DescriptorSize;
+    return handle;
+}
+
+D3D12_GPU_DESCRIPTOR_HANDLE DescriptorHeap::GPUHandleFromIndex(uint32_t descriptorIdx, uint32_t heapIdx) const
+{
+    D3D12_GPU_DESCRIPTOR_HANDLE handle = GPUStart;
+    handle.ptr += descriptorIdx * DescriptorSize;
+    return handle;
+}
+
+DescriptorAllocation DescriptorHeap::AllocateDescriptor()
+{
+    // DXR Path tracer makes use of SRWLockExclusive??
+    // maybe uses a render thread for commands?? an allocations?? - pretty feasible that it does this to be fair.
+    uint32_t idx = DeadList[AllocatedDescriptors];
+    ++AllocatedDescriptors;
+
+    DescriptorAllocation alloc;
+    alloc.Index = idx;
 
 
-    VERIFYD3D12RESULT(
-        DX12::Device->CreateCommittedResource(
-            &heapProps,
-            D3D12_HEAP_FLAG_NONE,
-            &desc,
-            D3D12_RESOURCE_STATE_GENERIC_READ,
-            nullptr,
-            IID_PPV_ARGS(UploadHeap.GetAddressOf())));
-
-    UpdateSubresources(DX12::GraphicsCmdList.Get(), Resource.Get(), UploadHeap.Get(),
-        0, 0, static_cast<UINT>(subresources.size()), subresources.data());
-
-    auto barrier = CD3DX12_RESOURCE_BARRIER::Transition(Resource.Get(),
-        D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE);
-    DX12::GraphicsCmdList->ResourceBarrier(1, &barrier);
-
-
-
-    D3D12_SHADER_RESOURCE_VIEW_DESC srvDesc = {};
-    srvDesc.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
-    srvDesc.Format = Resource->GetDesc().Format;
-    srvDesc.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
-    srvDesc.Texture2D.MipLevels = Resource->GetDesc().MipLevels;
-    srvDesc.Texture2D.ResourceMinLODClamp = 0.0f;
-
-    DX12::Device->CreateShaderResourceView(Resource.Get(), &srvDesc, hDescriptor);
+    alloc.Handle = CPUStart;
+    alloc.Handle.ptr += idx * DescriptorSize;
+    alloc.GPUHandle = GPUStart;
+    alloc.GPUHandle.ptr += idx * DescriptorSize;
+    return alloc;
 }
