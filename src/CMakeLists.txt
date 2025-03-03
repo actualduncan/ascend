@@ -49,6 +49,8 @@ set(SOURCES ascend/main.cpp
 			ascend/DX12/PCH.h
 			ascend/DX12/DDSTextureLoader12.cpp
 			ascend/DX12/DDSTextureLoader12.h
+			ascend/DX12/Textures.cpp
+			ascend/DX12/Textures.h
 			ascend/imgui/imconfig.h
 			ascend/imgui/imgui.cpp
 			ascend/imgui/imgui.h
@@ -78,6 +80,7 @@ set(SHADER_FILES ${HLSL_LIB_SHADER_FILES}
 				 ${HLSL_PS_SHADER_FILES})  
 				 
 set(SHADER_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ascend/Shader)
+set(RESOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/ascend/res)
 
 set_source_files_properties(${HLSL_LIB_SHADER_FILES} PROPERTIES VS_SHADER_TYPE lib)
 set_source_files_properties(${HLSL_LIB_SHADER_FILES} PROPERTIES VS_SHADER_MODEL 6_3)
@@ -158,6 +161,7 @@ file(GLOB_RECURSE AGILITY_HEADERS "${AGILITY_INCLUDE}/*.h*" )
 file(GLOB_RECURSE DXC_HEADERS "${DXC_INCLUDE}/*.h*" )
 file(GLOB_RECURSE ASSIMP_HEADERS "${ASSIMP_INCLUDE}/*.h*" )
 file( COPY ${SHADER_SOURCE_DIR} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug )
+file( COPY ${RESOURCE_DIR} DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug )
 file( COPY "${AGILITY_DLL}/" DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug )
 file( COPY "${ASSIMP_DLL}/" DESTINATION ${CMAKE_CURRENT_BINARY_DIR}/Debug )
 
