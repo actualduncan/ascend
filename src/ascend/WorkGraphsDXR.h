@@ -2,6 +2,7 @@
 #include "Model.h"
 #include "Camera.h"
 #include "InputCommands.h"
+#include "GBuffer.h"
 struct RayTraceConstants
 {
 	//XMFLOAT4X4 InvViewProjection;
@@ -24,9 +25,11 @@ public:
 	void Update(float dt, InputCommands* inputCommands);
 	void Render();
 	void ImGUI();
+	void InitGBuffer();
 
 private:
 	SwapChain m_swapChain;
+	GBuffer m_gBuffer;
 	DepthStencilBuffer m_depthStencilBuffer;
 	ComPtr<ID3D12Resource> m_indexBuffer;
 	ComPtr<ID3D12Resource> m_vertexBuffer;

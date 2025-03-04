@@ -656,6 +656,12 @@ void WorkGraphsDXR::LoadRasterAssets()
 		m_normHandle = alloc.GPUHandle;
 	}
 }
+
+void WorkGraphsDXR::InitGBuffer()
+{
+
+}
+
 void WorkGraphsDXR::DoRaster()
 {
 	DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
