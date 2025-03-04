@@ -284,14 +284,14 @@ void WorkGraphsDXR::CopyRasterOutputToWorkGraphInput()
 {
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
-	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_gBuffer.m_normalMap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
 	DX12::GraphicsCmdList->CopyResource(m_workGraphOutput.Get(), m_swapChain.BackBuffer());
-	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_normalTexRTV.Get());
+	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_gBuffer.m_normalMap.Get());
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
 
-	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_gBuffer.m_normalMap.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
 
 }
@@ -300,14 +300,14 @@ void WorkGraphsDXR::CopyRasterOutputToComputeInput()
 {
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
-	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_gBuffer.m_normalMap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
 	DX12::GraphicsCmdList->CopyResource(m_computeOutput.Get(), m_swapChain.BackBuffer());
-	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_normalTexRTV.Get());
+	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_gBuffer.m_normalMap.Get());
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
 
-	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_gBuffer.m_normalMap.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
 
 }
@@ -592,9 +592,11 @@ void WorkGraphsDXR::LoadRasterAssets()
 		psoDesc.DepthStencilState.StencilEnable = FALSE;
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		psoDesc.NumRenderTargets = 2;
+		psoDesc.NumRenderTargets = 4;
 		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psoDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_SNORM;
+		psoDesc.RTVFormats[2] = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		psoDesc.RTVFormats[3] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psoDesc.SampleDesc.Count = 1;
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPso = psoDesc;
@@ -619,6 +621,25 @@ void WorkGraphsDXR::LoadRasterAssets()
 		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_rasterPipelineState)));
 		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&transparentPso, IID_PPV_ARGS(&m_transparentPipelineState)));
 
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
+
+		DescriptorAllocation alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
+		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
+		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		DX12::Device->CreateUnorderedAccessView(m_normalTex.Get(), nullptr, &UAVDesc, alloc.Handle);
+		m_normHandle = alloc.GPUHandle;
+
+		InitGBuffer();
+	}
+}
+
+void WorkGraphsDXR::InitGBuffer()
+{
+	// normal
+	{
 		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
 
 		float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
@@ -632,7 +653,7 @@ void WorkGraphsDXR::LoadRasterAssets()
 
 		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
-			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &optClear, IID_PPV_ARGS(&m_normalTexRTV)));
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &optClear, IID_PPV_ARGS(&m_gBuffer.m_normalMap)));
 
 
 		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
@@ -642,24 +663,69 @@ void WorkGraphsDXR::LoadRasterAssets()
 		rtvDesc.Texture2D.PlaneSlice = 0;
 
 		DescriptorAllocation alloc = DX12::RTVDescriptorHeap.AllocateDescriptor();
-		DX12::Device->CreateRenderTargetView(m_normalTexRTV.Get(), &rtvDesc, alloc.Handle);
-		m_normRTVHandle = alloc.Handle;
+		DX12::Device->CreateRenderTargetView(m_gBuffer.m_normalMap.Get(), &rtvDesc, alloc.Handle);
+		m_gBuffer.normalMapHandle = alloc.Handle;
 
-		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
-			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
-
-		alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
-		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
-		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-		DX12::Device->CreateUnorderedAccessView(m_normalTex.Get(), nullptr, &UAVDesc, alloc.Handle);
-		m_normHandle = alloc.GPUHandle;
 	}
-}
+	
+	{
+		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32G32B32A32_FLOAT, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
 
-void WorkGraphsDXR::InitGBuffer()
-{
+		float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+		D3D12_CLEAR_VALUE optClear = {};
+		optClear.Color[0] = 0.0f;
+		optClear.Color[1] = 0.2f;
+		optClear.Color[2] = 0.4f;
+		optClear.Color[3] = 1.0f;
 
+		optClear.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &optClear, IID_PPV_ARGS(&m_gBuffer.m_worldSpacePosition)));
+
+
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtvDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		rtvDesc.Texture2D.MipSlice = 0;
+		rtvDesc.Texture2D.PlaneSlice = 0;
+
+		DescriptorAllocation alloc = DX12::RTVDescriptorHeap.AllocateDescriptor();
+		DX12::Device->CreateRenderTargetView(m_gBuffer.m_worldSpacePosition.Get(), &rtvDesc, alloc.Handle);
+		m_gBuffer.worldSpaceHandle = alloc.Handle;
+
+	}
+
+	{
+		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+
+		float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+		D3D12_CLEAR_VALUE optClear = {};
+		optClear.Color[0] = 0.0f;
+		optClear.Color[1] = 0.2f;
+		optClear.Color[2] = 0.4f;
+		optClear.Color[3] = 1.0f;
+
+		optClear.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &optClear, IID_PPV_ARGS(&m_gBuffer.m_materialId)));
+
+
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		rtvDesc.Texture2D.MipSlice = 0;
+		rtvDesc.Texture2D.PlaneSlice = 0;
+
+		DescriptorAllocation alloc = DX12::RTVDescriptorHeap.AllocateDescriptor();
+		DX12::Device->CreateRenderTargetView(m_gBuffer.m_materialId.Get(), &rtvDesc, alloc.Handle);
+		m_gBuffer.materialHandle = alloc.Handle;
+
+	}
+	
 }
 
 void WorkGraphsDXR::DoRaster()
@@ -672,17 +738,21 @@ void WorkGraphsDXR::DoRaster()
 	DX12::GraphicsCmdList->RSSetScissorRects(1, &m_scissorRect);
 
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandles[2];
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[4];
 	rtvHandles[0] = DX12::RTVDescriptorHeap.CPUHandleFromIndex(m_swapChain.GetD3DObject()->GetCurrentBackBufferIndex(), 0);
-	rtvHandles[1] = m_normRTVHandle;
+	rtvHandles[1] = m_gBuffer.normalMapHandle;
+	rtvHandles[2] = m_gBuffer.worldSpaceHandle;
+	rtvHandles[3] = m_gBuffer.materialHandle;
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = DX12::DSVDescriptorHeap.CPUHandleFromIndex(m_depthStencilBuffer.resourceIdx, 0);
-	DX12::GraphicsCmdList->OMSetRenderTargets(2, rtvHandles, FALSE, &dsvHandle);
+	DX12::GraphicsCmdList->OMSetRenderTargets(4, rtvHandles, FALSE, &dsvHandle);
 	DX12::GraphicsCmdList->OMSetStencilRef(1);
 	DX12::GraphicsCmdList->ClearDepthStencilView(DX12::DSVDescriptorHeap.CPUHandleFromIndex(m_depthStencilBuffer.resourceIdx,0), D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, NULL);
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[0], clearColor, 0, nullptr);
 	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[1], clearColor, 0, nullptr);
+	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[2], clearColor, 0, nullptr);
+	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[3], clearColor, 0, nullptr);
 	const uint64_t modelMeshCount = m_sponza->GetModelMeshVector().size();
 	for (int i = 0; i < modelMeshCount; ++i)
 	{

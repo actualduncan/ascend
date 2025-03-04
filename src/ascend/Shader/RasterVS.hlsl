@@ -28,7 +28,7 @@ float2 uv : TEXCOORD)
 
     result.position = mul(float4(position.xyz, 1.0f), ViewProjection);
     result.normal = normalize(normal);
-    result.tangent = normalize(tangent.xyz);
+    result.tangent =position.xyz;
     result.uv = uv;
     return result;
 }

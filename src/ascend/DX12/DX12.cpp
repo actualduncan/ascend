@@ -112,7 +112,7 @@ namespace DX12
 		FrameFence.Init(0);
 
 		// Create Descriptors
-		RTVDescriptorHeap.Init(3, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, false);
+		RTVDescriptorHeap.Init(10, D3D12_DESCRIPTOR_HEAP_TYPE_RTV, false);
 		UAVDescriptorHeap.Init(60, D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, true);
 		DSVDescriptorHeap.Init(RenderLatency, D3D12_DESCRIPTOR_HEAP_TYPE_DSV, false);
 
