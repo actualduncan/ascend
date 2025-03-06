@@ -1,9 +1,12 @@
 #include "WorkGraphsDXR.h"
 #include "DX12/DX12.h"
 #include "DX12/DX12_Helpers.h"
-#include "Shader/CompiledShaders/WorkGraphRaytracing.hlsl.h"
+
 #include <d3dcompiler.h>
+#include "Shader/CompiledShaders/WorkGraphRaytracing.hlsl.h"
 #include "Shader/CompiledShaders/ComputeRaytracing.hlsl.h"
+#include "Shader/CompiledShaders/RasterPS.hlsl.h"
+#include "Shader/CompiledShaders/RasterVS.hlsl.h"
 // To be moved to DXR namespace
 #pragma region RAY_TRACING
 
@@ -11,6 +14,7 @@ namespace GlobalRootSignatureParams {
 
 	enum Value {
 		OutputViewSlot = 0,
+		NormSlot,
 		AccelerationStructureSlot,
 		ConstantBufferSlot,
 		Count
@@ -45,53 +49,38 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_height = height;
 	DX12::Initialize(D3D_FEATURE_LEVEL_12_2);
 	m_swapChain.Initialize(hwnd, width, height);
-	// Create the constant buffer.
+	m_viewport = CD3DX12_VIEWPORT(0.0f, 0.0f, static_cast<float>(m_width), static_cast<float>(m_height));
+	m_scissorRect = CD3DX12_RECT(0, 0, static_cast<LONG>(m_width), static_cast<LONG>(m_height));
+
+	m_depthStencilBuffer.Create(L"ZBuffer", DXGI_FORMAT_D32_FLOAT_S8X24_UINT ,m_width, m_height);
+	m_rayTraceConstantBuffer.Create(L"Constant Buffer", sizeof(RayTraceConstants));
+	m_imgui = std::make_unique<IMGUI_Helper>(hwnd);
+	m_imgui->InitWin32DX12();
+	if (false)
 	{
-		const UINT constantBufferSize = sizeof(RayTraceConstants);    // CB size is required to be 256-byte aligned.
-		auto uploadHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_UPLOAD);
-		auto bufferDesc = CD3DX12_RESOURCE_DESC::Buffer(constantBufferSize);
-
-		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
-			&uploadHeapProperties,
-			D3D12_HEAP_FLAG_NONE,
-			&bufferDesc,
-			D3D12_RESOURCE_STATE_GENERIC_READ,
-			nullptr,
-			IID_PPV_ARGS(&m_constantBuffer)));
-		m_constantBuffer->SetName(L"Constant Buffer");
-		// Describe and create a constant buffer view.
-		D3D12_CONSTANT_BUFFER_VIEW_DESC cbvDesc = {};
-		cbvDesc.BufferLocation = m_constantBuffer->GetGPUVirtualAddress();
-		cbvDesc.SizeInBytes = constantBufferSize;
-		DX12::Device->CreateConstantBufferView(&cbvDesc, DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart());
-
-		// Map and initialize the constant buffer. We don't unmap this until the
-		// app closes. Keeping things mapped for the lifetime of the resource is okay.
-		CD3DX12_RANGE readRange(0, 0);        // We do not intend to read from this resource on the CPU.
-		VERIFYD3D12RESULT(m_constantBuffer->Map(0, &readRange, reinterpret_cast<void**>(&m_pCbvDataBegin)));
-		memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
-	}
-
-	if (true)
-	{
+		LoadRasterAssets();
 		CreateWorkGraphRootSignature();
 		CreateWorkGraph();
 	}
 	else
 	{
+		LoadRasterAssets();
 		LoadComputeAssets();
 	}
+	m_imgui->CreatePSO();
 
 	DX12::WaitForGPU();
 	CreateRaytracingInterfaces();
+
 	float aspectRatio = float(width) / float(height);
 	m_camera = std::make_unique<Camera>(hwnd, aspectRatio);
+
 	LoadModels();
 }
 
 void WorkGraphsDXR::LoadModels()
 {
-	m_teapot = std::make_unique<Model>("debug/Shader/teapot.obj");
+	m_sponza = std::make_unique<Model>("debug/res/sponza.obj", "debug/res/textures/");
 }
 
 void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
@@ -102,9 +91,11 @@ void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
 	m_camera->Update(dt, *inputCommands);
 	XMMATRIX viewProj = m_camera->GetView() * m_camera->GetProjectionMatrix();
 	XMVECTOR det = XMMatrixDeterminant(viewProj);
-	m_constantBufferData.InvViewProjection = XMMatrixTranspose(XMMatrixInverse(nullptr, viewProj));
+	m_constantBufferData.ViewProjection = XMMatrixTranspose( viewProj);
+	m_constantBufferData.InvProjection = XMMatrixTranspose(XMMatrixInverse(nullptr,viewProj));
 	m_constantBufferData.CameraPosWS = XMFLOAT4(m_camera->GetPosition().x, m_camera->GetPosition().y, m_camera->GetPosition().z, 1.0f);
-	memcpy(m_pCbvDataBegin, &m_constantBufferData, sizeof(m_constantBufferData));
+	m_constantBufferData.LightPos = XMFLOAT4(0, 50, 0, 1.0f);
+	m_rayTraceConstantBuffer.UpdateContents(&m_constantBufferData, sizeof(RayTraceConstants));
 
 	// imgui frame
 	// other stuff
@@ -119,30 +110,39 @@ void WorkGraphsDXR::Render()
 	DX12::StartFrame();
 	m_swapChain.StartFrame();
 
+
 	if (m_shouldBuildAccelerationStructures)
 	{
 		BuildAccelerationStructuresForCompute();
 	}
 
-	if (true)
+	if (false)
 	{
+		DoRaster();
+		CopyRasterOutputToWorkGraphInput();
 		DispatchWorkGraph();
 		CopyWorkGraphOutputToBackBuffer();
 	}
 	else
 	{
+		DoRaster();
+		CopyRasterOutputToComputeInput();
 		DoCompute();
 		CopyComputeOutputToBackBuffer();
 	}
 
+	ImGui();
 
 	m_swapChain.EndFrame();
 	DX12::EndFrame(m_swapChain.GetD3DObject());
 }
 
-void WorkGraphsDXR::ImGUI()
+void WorkGraphsDXR::ImGui()
 {
-
+	m_imgui->StartFrame();
+	// put imgui interface code here
+	ImGui::ShowDemoWindow();
+	m_imgui->EndFrame();
 }
 
 void WorkGraphsDXR::CreateWorkGraph()
@@ -222,12 +222,14 @@ void WorkGraphsDXR::CreateWorkGraph()
 
 void WorkGraphsDXR::CreateWorkGraphRootSignature()
 {
-	CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
-	UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-	CD3DX12_ROOT_PARAMETER rootParameters[3];
-	rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
-	rootParameters[1].InitAsShaderResourceView(0);
-	rootParameters[2].InitAsConstantBufferView(0);
+	CD3DX12_DESCRIPTOR_RANGE UAVDescriptor[2];
+	UAVDescriptor[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+	UAVDescriptor[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
+	CD3DX12_ROOT_PARAMETER rootParameters[4];
+	rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor[0]);
+	rootParameters[1].InitAsDescriptorTable(1, &UAVDescriptor[1]);
+	rootParameters[2].InitAsShaderResourceView(0);
+	rootParameters[3].InitAsConstantBufferView(0);
 	ComPtr<ID3DBlob> signature;
 	ComPtr<ID3DBlob> error;
 
@@ -243,17 +245,13 @@ void WorkGraphsDXR::CreateWorkGraphRootSignature()
 		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
 			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_workGraphOutput)));
-
-
-		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 0, DX12::UAVDescriptorSize);
-		//m_raytracingOutputResourceUAVDescriptorHeapIndex = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, descriptorIndexToUse, m_computeDescriptorSize);
+		
+		DescriptorAllocation alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
 		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
 		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-		DX12::Device->CreateUnorderedAccessView(m_workGraphOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
-		m_workGraphOutputUavDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-
+		DX12::Device->CreateUnorderedAccessView(m_workGraphOutput.Get(), nullptr, &UAVDesc, alloc.Handle);
+		m_workGraphOutputUavDescriptorHandle = alloc.GPUHandle;
 	}
-
 }
 
 void WorkGraphsDXR::DispatchWorkGraph()
@@ -262,8 +260,9 @@ void WorkGraphsDXR::DispatchWorkGraph()
 	//D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
 	//DX12::GraphicsCmdList->SetDescriptorHeaps(1, m_srvHeap.GetAddressOf());
 	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_workGraphOutputUavDescriptorHandle);
+	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::NormSlot, m_normHandle);
 	DX12::GraphicsCmdList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
-	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_constantBuffer->GetGPUVirtualAddress());
+	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
 
 	D3D12_DISPATCH_GRAPH_DESC dispatchDesc = {};
 	dispatchDesc.Mode = D3D12_DISPATCH_MODE_NODE_CPU_INPUT;
@@ -288,6 +287,38 @@ void WorkGraphsDXR::DispatchWorkGraph()
 	m_workGraphProgramDesc.WorkGraph.Flags &= ~D3D12_SET_WORK_GRAPH_FLAG_INITIALIZE;
 }
 
+void WorkGraphsDXR::CopyRasterOutputToWorkGraphInput()
+{
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_gBuffer.m_normalMap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
+	DX12::GraphicsCmdList->CopyResource(m_workGraphOutput.Get(), m_swapChain.BackBuffer());
+	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_gBuffer.m_normalMap.Get());
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
+
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_gBuffer.m_normalMap.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
+
+}
+
+void WorkGraphsDXR::CopyRasterOutputToComputeInput()
+{
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_gBuffer.m_normalMap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
+	DX12::GraphicsCmdList->CopyResource(m_computeOutput.Get(), m_swapChain.BackBuffer());
+	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_gBuffer.m_normalMap.Get());
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
+
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_gBuffer.m_normalMap.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
+
+}
+
 void WorkGraphsDXR::CopyWorkGraphOutputToBackBuffer()
 {
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_DEST, 0);
@@ -308,19 +339,19 @@ void WorkGraphsDXR::CreateRaytracingInterfaces()
 
 void WorkGraphsDXR::BuildAccelerationStructuresForCompute()
 {
-	const uint64_t modelMeshCount = m_teapot->GetModelMeshVector().size();
+	const uint64_t modelMeshCount = m_sponza->GetModelMeshVector().size();
 	std::vector<D3D12_RAYTRACING_GEOMETRY_DESC> geometryDescs(modelMeshCount);
 	for (int i = 0; i < modelMeshCount; ++i)
 	{
 		geometryDescs[i].Type = D3D12_RAYTRACING_GEOMETRY_TYPE_TRIANGLES;
 		geometryDescs[i].Triangles.VertexFormat = DXGI_FORMAT_R32G32B32_FLOAT;
-		geometryDescs[i].Triangles.VertexCount = m_teapot->GetModelMeshVector()[i].numVertices;;
-		geometryDescs[i].Triangles.VertexBuffer.StartAddress = m_teapot->GetVertexBuffer().BufferLocation + m_teapot->GetModelMeshVector()[i].vertexOffset;
-		geometryDescs[i].Triangles.VertexBuffer.StrideInBytes = m_teapot->GetVertexBuffer().StrideInBytes;
+		geometryDescs[i].Triangles.VertexCount = m_sponza->GetModelMeshVector()[i].numVertices;;
+		geometryDescs[i].Triangles.VertexBuffer.StartAddress = m_sponza->GetVertexBuffer().BufferLocation + m_sponza->GetModelMeshVector()[i].vertexOffset;
+		geometryDescs[i].Triangles.VertexBuffer.StrideInBytes = m_sponza->GetVertexBuffer().StrideInBytes;
 		geometryDescs[i].Triangles.Transform3x4 = 0;
-		geometryDescs[i].Triangles.IndexBuffer = m_teapot->GetIndexBuffer().BufferLocation + m_teapot->GetModelMeshVector()[i].indexOffset;
-		geometryDescs[i].Triangles.IndexCount = m_teapot->GetModelMeshVector()[i].numIndices;
-		geometryDescs[i].Triangles.IndexFormat = m_teapot->GetIndexBuffer().Format;
+		geometryDescs[i].Triangles.IndexBuffer = m_sponza->GetIndexBuffer().BufferLocation + m_sponza->GetModelMeshVector()[i].indexOffset;
+		geometryDescs[i].Triangles.IndexCount = m_sponza->GetModelMeshVector()[i].numIndices;
+		geometryDescs[i].Triangles.IndexFormat = m_sponza->GetIndexBuffer().Format;
 
 		geometryDescs[i].Flags = D3D12_RAYTRACING_GEOMETRY_FLAG_OPAQUE;
 	}
@@ -392,16 +423,15 @@ void WorkGraphsDXR::BuildAccelerationStructuresForCompute()
 
 		// Identity matrix
 		ZeroMemory(instanceDesc[i].Transform, sizeof(instanceDesc[i].Transform));
-		instanceDesc[i].Transform[0][0] = 0.1f;
-		instanceDesc[i].Transform[1][1] = 0.1f;
-		instanceDesc[i].Transform[2][2] = 0.1f;
+		instanceDesc[i].Transform[0][0] = 1.0f;
+		instanceDesc[i].Transform[1][1] = 1.0f;
+		instanceDesc[i].Transform[2][2] = 1.0f;
 
 		instanceDesc[i].AccelerationStructure = m_bottomLevelAccelerationStructures[i]->GetGPUVirtualAddress();
 		instanceDesc[i].Flags = 0;
 		instanceDesc[i].InstanceID = 0;
 		instanceDesc[i].InstanceMask = 1;
 		instanceDesc[i].InstanceContributionToHitGroupIndex = i;
-
 	}
 
 	AllocateUploadBuffer(DX12::Device.Get(), instanceDesc.data(), instanceDesc.size() * sizeof(D3D12_RAYTRACING_INSTANCE_DESC), &instanceDescs, L"InstanceDescs");
@@ -427,13 +457,14 @@ void WorkGraphsDXR::BuildAccelerationStructuresForCompute()
 void WorkGraphsDXR::LoadComputeAssets()
 {
 	{
-		CD3DX12_DESCRIPTOR_RANGE UAVDescriptor;
-		UAVDescriptor.Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
-		CD3DX12_ROOT_PARAMETER rootParameters[3];
-		rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor);
-		rootParameters[1].InitAsShaderResourceView(0);
-		rootParameters[2].InitAsConstantBufferView(0);
-
+		CD3DX12_DESCRIPTOR_RANGE UAVDescriptor[2];
+		UAVDescriptor[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 0);
+		UAVDescriptor[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_UAV, 1, 1);
+		CD3DX12_ROOT_PARAMETER rootParameters[4];
+		rootParameters[0].InitAsDescriptorTable(1, &UAVDescriptor[0]);
+		rootParameters[1].InitAsDescriptorTable(1, &UAVDescriptor[1]);
+		rootParameters[2].InitAsShaderResourceView(0);
+		rootParameters[3].InitAsConstantBufferView(0);
 		ComPtr<ID3DBlob> signature;
 		ComPtr<ID3DBlob> error;
 
@@ -456,8 +487,6 @@ void WorkGraphsDXR::LoadComputeAssets()
 		NAME_D3D12_OBJECT(m_computePipelineState);
 	}
 
-
-
 	{
 		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
@@ -466,27 +495,27 @@ void WorkGraphsDXR::LoadComputeAssets()
 			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_computeOutput)));
 
 
-		D3D12_CPU_DESCRIPTOR_HANDLE uavDescriptorHandle = CD3DX12_CPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetCPUDescriptorHandleForHeapStart(), 0, DX12::UAVDescriptorSize);
-		//m_raytracingOutputResourceUAVDescriptorHeapIndex = CD3DX12_CPU_DESCRIPTOR_HANDLE(descriptorHeapCpuBase, descriptorIndexToUse, m_computeDescriptorSize);
+		m_computeOutput->SetName(L"Compute Output");
+		DescriptorAllocation alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
+
 		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
 		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-		DX12::Device->CreateUnorderedAccessView(m_computeOutput.Get(), nullptr, &UAVDesc, uavDescriptorHandle);
-		m_computeOutputUavDescriptorHandle = CD3DX12_GPU_DESCRIPTOR_HANDLE(DX12::UAVDescriptorHeap->GetGPUDescriptorHandleForHeapStart());
-
+		DX12::Device->CreateUnorderedAccessView(m_computeOutput.Get(), nullptr, &UAVDesc, alloc.Handle);
+		
+		m_computeOutputUavDescriptorHandle = alloc.GPUHandle;
 	}
 }
 
 void WorkGraphsDXR::DoCompute()
 {
 	DX12::GraphicsCmdList->SetPipelineState(m_computePipelineState.Get());
-	//D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
-	DX12::GraphicsCmdList->SetDescriptorHeaps(1, DX12::UAVDescriptorHeap.GetAddressOf());
+	DX12::GraphicsCmdList->SetDescriptorHeaps(1, DX12::UAVDescriptorHeap.Heap.GetAddressOf());
 	DX12::GraphicsCmdList->SetComputeRootSignature(m_computeRootSignature.Get());
 	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_computeOutputUavDescriptorHandle);
+	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::NormSlot, m_normHandle);
 	DX12::GraphicsCmdList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
-	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_constantBuffer->GetGPUVirtualAddress());
+	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
 	DX12::GraphicsCmdList->Dispatch(m_width, m_height, 1);
-
 }
 
 void WorkGraphsDXR::CopyComputeOutputToBackBuffer()
@@ -498,6 +527,274 @@ void WorkGraphsDXR::CopyComputeOutputToBackBuffer()
 
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
+}
+
+void WorkGraphsDXR::LoadRasterAssets()
+{
+	 // Create the root signature.
+	{
+		CD3DX12_DESCRIPTOR_RANGE1 ranges[2];
+		ranges[0].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 0, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+		ranges[1].Init(D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, 1, 0, D3D12_DESCRIPTOR_RANGE_FLAG_DATA_VOLATILE);
+		CD3DX12_ROOT_PARAMETER1 rootParameters[3];
+		rootParameters[0].InitAsDescriptorTable(1, &ranges[0], D3D12_SHADER_VISIBILITY_PIXEL);
+		rootParameters[1].InitAsDescriptorTable(1, &ranges[1], D3D12_SHADER_VISIBILITY_PIXEL);
+		rootParameters[2].InitAsConstantBufferView(0);
+
+		ComPtr<ID3DBlob> signature;
+		ComPtr<ID3DBlob> error;
+
+		D3D12_STATIC_SAMPLER_DESC sampler = {};
+		sampler.Filter = D3D12_FILTER_MIN_MAG_MIP_POINT;
+		sampler.AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		sampler.AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		sampler.AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+		sampler.MipLODBias = 0;
+		sampler.MaxAnisotropy = 0;
+		sampler.ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER;
+		sampler.BorderColor = D3D12_STATIC_BORDER_COLOR_TRANSPARENT_BLACK;
+		sampler.MinLOD = 0.0f;
+		sampler.MaxLOD = D3D12_FLOAT32_MAX;
+		sampler.ShaderRegister = 0;
+		sampler.RegisterSpace = 0;
+		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
+		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters, 1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
+		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
+		VERIFYD3D12RESULT(DX12::Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rasterRootSignature)));
+	}
+
+	// Create the pipeline state, which includes compiling and loading shaders.
+	{
+		// Define the vertex input layout.
+		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
+		{
+			{ "POSITION", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 0, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "NORMAL", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 12, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 24, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "BITTANGENT", 0, DXGI_FORMAT_R32G32B32_FLOAT, 0, 36, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 },
+			{ "TEXCOORD", 0, DXGI_FORMAT_R32G32_FLOAT, 0, 48, D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA, 0 }
+		};
+		
+		// Describe and create the graphics pipeline state object (PSO).
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC psoDesc = {};
+		psoDesc.InputLayout = { inputElementDescs, _countof(inputElementDescs) };
+		psoDesc.pRootSignature = m_rasterRootSignature.Get();
+		psoDesc.VS = CD3DX12_SHADER_BYTECODE((void*)g_pRasterVS, ARRAYSIZE(g_pRasterVS));
+		psoDesc.PS = CD3DX12_SHADER_BYTECODE((void*)g_pRasterPS, ARRAYSIZE(g_pRasterPS));
+		psoDesc.RasterizerState = CD3DX12_RASTERIZER_DESC(D3D12_DEFAULT);
+		psoDesc.BlendState = CD3DX12_BLEND_DESC(D3D12_DEFAULT);
+		psoDesc.DepthStencilState.DepthEnable = TRUE;
+		psoDesc.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ALL;
+		psoDesc.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+		psoDesc.DSVFormat = m_depthStencilBuffer.GetFormat();
+		psoDesc.DepthStencilState.StencilEnable = FALSE;
+		psoDesc.SampleMask = UINT_MAX;
+		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		psoDesc.NumRenderTargets = 4;
+		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		psoDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_SNORM;
+		psoDesc.RTVFormats[2] = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		psoDesc.RTVFormats[3] = DXGI_FORMAT_R8G8B8A8_UNORM;
+		psoDesc.SampleDesc.Count = 1;
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPso = psoDesc;
+		transparentPso.DepthStencilState.DepthEnable = TRUE;
+		transparentPso.DepthStencilState.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
+		transparentPso.DepthStencilState.DepthFunc = D3D12_COMPARISON_FUNC_GREATER_EQUAL;
+		transparentPso.RasterizerState.CullMode = D3D12_CULL_MODE_NONE;
+
+		D3D12_RENDER_TARGET_BLEND_DESC transparencyBlendDesc;
+		transparencyBlendDesc.BlendEnable = TRUE;
+		transparencyBlendDesc.LogicOpEnable = FALSE;
+		transparencyBlendDesc.SrcBlend = D3D12_BLEND_SRC_ALPHA;
+		transparencyBlendDesc.DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+		transparencyBlendDesc.BlendOp = D3D12_BLEND_OP_ADD;
+		transparencyBlendDesc.SrcBlendAlpha = D3D12_BLEND_ONE;
+		transparencyBlendDesc.DestBlendAlpha = D3D12_BLEND_ZERO;
+		transparencyBlendDesc.BlendOpAlpha = D3D12_BLEND_OP_ADD;
+		transparencyBlendDesc.LogicOp = D3D12_LOGIC_OP_NOOP;
+		transparencyBlendDesc.RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+		transparentPso.BlendState.RenderTarget[0] = transparencyBlendDesc;
+
+		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_rasterPipelineState)));
+		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&transparentPso, IID_PPV_ARGS(&m_transparentPipelineState)));
+
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
+
+		DescriptorAllocation alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
+		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
+		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		DX12::Device->CreateUnorderedAccessView(m_normalTex.Get(), nullptr, &UAVDesc, alloc.Handle);
+		m_normHandle = alloc.GPUHandle;
+
+		InitGBuffer();
+	}
+}
+
+void WorkGraphsDXR::InitGBuffer()
+{
+	// normal
+	{
+		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+
+		float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+		D3D12_CLEAR_VALUE optClear = {};
+		optClear.Color[0] = 0.0f;
+		optClear.Color[1] = 0.2f;
+		optClear.Color[2] = 0.4f;
+		optClear.Color[3] = 1.0f;
+
+		optClear.Format = DXGI_FORMAT_R8G8B8A8_SNORM;
+
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &optClear, IID_PPV_ARGS(&m_gBuffer.m_normalMap)));
 
 
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_SNORM;
+		rtvDesc.Texture2D.MipSlice = 0;
+		rtvDesc.Texture2D.PlaneSlice = 0;
+
+		DescriptorAllocation alloc = DX12::RTVDescriptorHeap.AllocateDescriptor();
+		DX12::Device->CreateRenderTargetView(m_gBuffer.m_normalMap.Get(), &rtvDesc, alloc.Handle);
+		m_gBuffer.normalMapHandle = alloc.Handle;
+
+	}
+	
+	{
+		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32G32B32A32_FLOAT, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+
+		float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+		D3D12_CLEAR_VALUE optClear = {};
+		optClear.Color[0] = 0.0f;
+		optClear.Color[1] = 0.2f;
+		optClear.Color[2] = 0.4f;
+		optClear.Color[3] = 1.0f;
+
+		optClear.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &optClear, IID_PPV_ARGS(&m_gBuffer.m_worldSpacePosition)));
+
+
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtvDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		rtvDesc.Texture2D.MipSlice = 0;
+		rtvDesc.Texture2D.PlaneSlice = 0;
+
+		DescriptorAllocation alloc = DX12::RTVDescriptorHeap.AllocateDescriptor();
+		DX12::Device->CreateRenderTargetView(m_gBuffer.m_worldSpacePosition.Get(), &rtvDesc, alloc.Handle);
+		m_gBuffer.worldSpaceHandle = alloc.Handle;
+
+	}
+
+	{
+		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+
+		float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+		D3D12_CLEAR_VALUE optClear = {};
+		optClear.Color[0] = 0.0f;
+		optClear.Color[1] = 0.2f;
+		optClear.Color[2] = 0.4f;
+		optClear.Color[3] = 1.0f;
+
+		optClear.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &optClear, IID_PPV_ARGS(&m_gBuffer.m_materialId)));
+
+
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		rtvDesc.Texture2D.MipSlice = 0;
+		rtvDesc.Texture2D.PlaneSlice = 0;
+
+		DescriptorAllocation alloc = DX12::RTVDescriptorHeap.AllocateDescriptor();
+		DX12::Device->CreateRenderTargetView(m_gBuffer.m_materialId.Get(), &rtvDesc, alloc.Handle);
+		m_gBuffer.materialHandle = alloc.Handle;
+
+	}
+	
+}
+
+void WorkGraphsDXR::DoRaster()
+{
+	DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
+	DX12::GraphicsCmdList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
+	DX12::GraphicsCmdList->SetGraphicsRootConstantBufferView(2, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
+
+	DX12::GraphicsCmdList->RSSetViewports(1, &m_viewport);
+	DX12::GraphicsCmdList->RSSetScissorRects(1, &m_scissorRect);
+
+
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[4];
+	rtvHandles[0] = DX12::RTVDescriptorHeap.CPUHandleFromIndex(m_swapChain.GetD3DObject()->GetCurrentBackBufferIndex(), 0);
+	rtvHandles[1] = m_gBuffer.normalMapHandle;
+	rtvHandles[2] = m_gBuffer.worldSpaceHandle;
+	rtvHandles[3] = m_gBuffer.materialHandle;
+	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = DX12::DSVDescriptorHeap.CPUHandleFromIndex(m_depthStencilBuffer.resourceIdx, 0);
+	DX12::GraphicsCmdList->OMSetRenderTargets(4, rtvHandles, FALSE, &dsvHandle);
+	DX12::GraphicsCmdList->OMSetStencilRef(1);
+	DX12::GraphicsCmdList->ClearDepthStencilView(DX12::DSVDescriptorHeap.CPUHandleFromIndex(m_depthStencilBuffer.resourceIdx,0), D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, NULL);
+	// Record commands.
+	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[0], clearColor, 0, nullptr);
+	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[1], clearColor, 0, nullptr);
+	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[2], clearColor, 0, nullptr);
+	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[3], clearColor, 0, nullptr);
+	const uint64_t modelMeshCount = m_sponza->GetModelMeshVector().size();
+	for (int i = 0; i < modelMeshCount; ++i)
+	{
+			
+		auto mesh = m_sponza->GetModelMeshVector()[i];
+
+		if (mesh.materialIdx != 1 && mesh.materialIdx != 3)
+		{
+			DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
+			D3D12_GPU_DESCRIPTOR_HANDLE albedoDescriptor = DX12::UAVDescriptorHeap.GPUHandleFromIndex(m_sponza->m_modelMaterials[mesh.materialIdx].Texture(MaterialTextures::ALBEDO)->Texture.ResourceIdx, 0);
+			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, albedoDescriptor);
+			D3D12_GPU_DESCRIPTOR_HANDLE normalDescriptor = DX12::UAVDescriptorHeap.GPUHandleFromIndex(m_sponza->m_modelMaterials[mesh.materialIdx].Texture(MaterialTextures::NORMAL)->Texture.ResourceIdx, 0);
+			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(1, normalDescriptor);
+			D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
+			D3D12_INDEX_BUFFER_VIEW ibView = mesh.GetIndexBufferView();
+
+			DX12::GraphicsCmdList->IASetVertexBuffers(0, 1, &vbView);
+			DX12::GraphicsCmdList->IASetIndexBuffer(&ibView);
+			DX12::GraphicsCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			DX12::GraphicsCmdList->DrawIndexedInstanced(mesh.numIndices, 1, 0, 0, 0);
+		}
+
+	}
+	for (int i = 0; i < modelMeshCount; ++i)
+	{
+
+		auto mesh = m_sponza->GetModelMeshVector()[i];
+		if (mesh.materialIdx == 1  || mesh.materialIdx == 3)
+		{
+			DX12::GraphicsCmdList->SetPipelineState(m_transparentPipelineState.Get());
+			D3D12_GPU_DESCRIPTOR_HANDLE albedoDescriptor = DX12::UAVDescriptorHeap.GPUHandleFromIndex(m_sponza->m_modelMaterials[mesh.materialIdx].Texture(MaterialTextures::ALBEDO)->Texture.ResourceIdx, 0);
+			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(0, albedoDescriptor);
+			D3D12_GPU_DESCRIPTOR_HANDLE normalDescriptor = DX12::UAVDescriptorHeap.GPUHandleFromIndex(m_sponza->m_modelMaterials[mesh.materialIdx].Texture(MaterialTextures::NORMAL)->Texture.ResourceIdx, 0);
+			DX12::GraphicsCmdList->SetGraphicsRootDescriptorTable(1, normalDescriptor);
+			D3D12_VERTEX_BUFFER_VIEW vbView = mesh.GetVertexBufferView();
+			D3D12_INDEX_BUFFER_VIEW ibView = mesh.GetIndexBufferView();
+
+			DX12::GraphicsCmdList->IASetVertexBuffers(0, 1, &vbView);
+			DX12::GraphicsCmdList->IASetIndexBuffer(&ibView);
+			DX12::GraphicsCmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+
+			DX12::GraphicsCmdList->DrawIndexedInstanced(mesh.numIndices, 1, 0, 0, 0);
+		}
+
+	}
 }
