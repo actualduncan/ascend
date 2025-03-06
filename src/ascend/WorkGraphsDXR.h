@@ -3,6 +3,7 @@
 #include "Camera.h"
 #include "InputCommands.h"
 #include "GBuffer.h"
+#include "IMGuiHelper.h"
 struct RayTraceConstants
 {
 	//XMFLOAT4X4 InvViewProjection;
@@ -24,17 +25,17 @@ public:
 	void LoadModels();
 	void Update(float dt, InputCommands* inputCommands);
 	void Render();
-	void ImGUI();
+	void ImGui();
 	void InitGBuffer();
 
 private:
+	std::unique_ptr<IMGUI_Helper> m_imgui;
 	SwapChain m_swapChain;
 	GBuffer m_gBuffer;
 	DepthStencilBuffer m_depthStencilBuffer;
 	ComPtr<ID3D12Resource> m_indexBuffer;
 	ComPtr<ID3D12Resource> m_vertexBuffer;
 	ComPtr<ID3D12Resource> m_normalTex;
-	ComPtr<ID3D12Resource> m_normalTexRTV;
 	ConstantBuffer m_rayTraceConstantBuffer;
 	RayTraceConstants m_constantBufferData;
 

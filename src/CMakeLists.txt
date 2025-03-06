@@ -40,6 +40,8 @@ set(SOURCES ascend/main.cpp
 			ascend/Model.cpp
 			ascend/WorkGraphsDXR.h
 			ascend/WorkGraphsDXR.cpp
+			ascend/IMGuiHelper.h
+			ascend/IMGuiHelper.cpp
 			ascend/DX12/DDSTextureLoader12.cpp
 			ascend/DX12/DDSTextureLoader12.h
 			ascend/DX12/DX12.h
@@ -74,8 +76,8 @@ set(SOURCES ascend/main.cpp
 # TODO: Move to .cmake file for shader compiling - Reduce code duplication.
 set(HLSL_LIB_SHADER_FILES ascend/Shader/WorkGraphRaytracing.hlsl)
 set(HLSL_CS_SHADER_FILES  ascend/Shader/ComputeRaytracing.hlsl)
-set(HLSL_VS_SHADER_FILES ascend/Shader/RasterVS.hlsl)
-set(HLSL_PS_SHADER_FILES ascend/Shader/RasterPS.hlsl)
+set(HLSL_VS_SHADER_FILES ascend/Shader/RasterVS.hlsl ascend/Shader/IMGuiVS.hlsl)
+set(HLSL_PS_SHADER_FILES ascend/Shader/RasterPS.hlsl ascend/Shader/IMGuiPS.hlsl)
 set(SHADER_FILES ${HLSL_LIB_SHADER_FILES} 					  
 				 ${HLSL_CS_SHADER_FILES}
 				 ${HLSL_VS_SHADER_FILES}

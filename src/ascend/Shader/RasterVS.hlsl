@@ -11,7 +11,7 @@ struct PSInput
 {
     float4 position : SV_POSITION;
     float4 normal : NORMAL;
-    float3 tangent : TANGENT;
+    float4 tangent : TANGENT;
     float3 bitTangent : BITTANGENT;
     float2 uv : TEXCOORD;
 };
@@ -28,7 +28,7 @@ float2 uv : TEXCOORD)
 
     result.position = mul(float4(position.xyz, 1.0f), ViewProjection);
     result.normal = normalize(normal);
-    result.tangent =position.xyz;
+    result.tangent = position;
     result.uv = uv;
     return result;
 }

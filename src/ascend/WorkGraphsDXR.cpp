@@ -54,7 +54,8 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 
 	m_depthStencilBuffer.Create(L"ZBuffer", DXGI_FORMAT_D32_FLOAT_S8X24_UINT ,m_width, m_height);
 	m_rayTraceConstantBuffer.Create(L"Constant Buffer", sizeof(RayTraceConstants));
-
+	m_imgui = std::make_unique<IMGUI_Helper>(hwnd);
+	m_imgui->InitWin32DX12();
 	if (false)
 	{
 		LoadRasterAssets();
@@ -66,6 +67,7 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 		LoadRasterAssets();
 		LoadComputeAssets();
 	}
+	m_imgui->CreatePSO();
 
 	DX12::WaitForGPU();
 	CreateRaytracingInterfaces();
@@ -108,6 +110,7 @@ void WorkGraphsDXR::Render()
 	DX12::StartFrame();
 	m_swapChain.StartFrame();
 
+
 	if (m_shouldBuildAccelerationStructures)
 	{
 		BuildAccelerationStructuresForCompute();
@@ -128,14 +131,18 @@ void WorkGraphsDXR::Render()
 		CopyComputeOutputToBackBuffer();
 	}
 
+	ImGui();
 
 	m_swapChain.EndFrame();
 	DX12::EndFrame(m_swapChain.GetD3DObject());
 }
 
-void WorkGraphsDXR::ImGUI()
+void WorkGraphsDXR::ImGui()
 {
-
+	m_imgui->StartFrame();
+	// put imgui interface code here
+	ImGui::ShowDemoWindow();
+	m_imgui->EndFrame();
 }
 
 void WorkGraphsDXR::CreateWorkGraph()
@@ -553,20 +560,11 @@ void WorkGraphsDXR::LoadRasterAssets()
 		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters, 1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
-		VERIFYD3D12RESULT(DX12::Device ->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rasterRootSignature)));
+		VERIFYD3D12RESULT(DX12::Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rasterRootSignature)));
 	}
 
 	// Create the pipeline state, which includes compiling and loading shaders.
 	{
-		ComPtr<ID3DBlob> vertexShader;
-		ComPtr<ID3DBlob> pixelShader;
-
-#if defined(_DEBUG)
-		// Enable better shader debugging with the graphics debugging tools.
-		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#else
-		UINT compileFlags = 0;
-#endif
 		// Define the vertex input layout.
 		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
 		{
