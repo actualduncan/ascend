@@ -56,7 +56,7 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_rayTraceConstantBuffer.Create(L"Constant Buffer", sizeof(RayTraceConstants));
 	m_imgui = std::make_unique<IMGUI_Helper>(hwnd);
 	m_imgui->InitWin32DX12();
-	if (false)
+	if (true)
 	{
 		LoadRasterAssets();
 		CreateWorkGraphRootSignature();
@@ -116,7 +116,7 @@ void WorkGraphsDXR::Render()
 		BuildAccelerationStructuresForCompute();
 	}
 
-	if (false)
+	if (true)
 	{
 		DoRaster();
 		CopyRasterOutputToWorkGraphInput();
@@ -159,7 +159,7 @@ void WorkGraphsDXR::CreateWorkGraph()
 	workGraphSubobject->SetProgramName(WorkGraphProgramName);
 
 	auto rootNodeDispatchGrid = workGraphSubobject->CreateBroadcastingLaunchNodeOverrides(L"EntryFunction");
-	rootNodeDispatchGrid->DispatchGrid(m_width, m_height, 1);
+	rootNodeDispatchGrid->DispatchGrid(ceil(m_width / 8), ceil(m_height / 8), 1);
 
 	// create shader library
 	auto lib = stateObjectDesc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
@@ -515,7 +515,7 @@ void WorkGraphsDXR::DoCompute()
 	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::NormSlot, m_normHandle);
 	DX12::GraphicsCmdList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
 	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
-	DX12::GraphicsCmdList->Dispatch(m_width, m_height, 1);
+	DX12::GraphicsCmdList->Dispatch(ceil(m_width / 8), ceil(m_height / 8), 1);
 }
 
 void WorkGraphsDXR::CopyComputeOutputToBackBuffer()
