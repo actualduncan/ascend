@@ -31,24 +31,28 @@ set_target_properties(ASSIMP PROPERTIES
 
 
 set(SOURCES ascend/main.cpp 
-			ascend/WorkGraphsDXR.h
-			ascend/WorkGraphsDXR.cpp
-			ascend/Model.h
-			ascend/Model.cpp
 			ascend/Camera.h
 			ascend/Camera.cpp
+			ascend/GBuffer.h
+			ascend/GBuffer.cpp
 			ascend/InputCommands.h
+			ascend/Model.h
+			ascend/Model.cpp
+			ascend/WorkGraphsDXR.h
+			ascend/WorkGraphsDXR.cpp
+			ascend/IMGuiHelper.h
+			ascend/IMGuiHelper.cpp
+			ascend/DX12/DDSTextureLoader12.cpp
+			ascend/DX12/DDSTextureLoader12.h
 			ascend/DX12/DX12.h
 			ascend/DX12/DX12.cpp
 			ascend/DX12/DX12_Helpers.h
 			ascend/DX12/DX12_Helpers.cpp
 			ascend/DX12/GraphicsTypes.h
 			ascend/DX12/GraphicsTypes.cpp
+			ascend/DX12/PCH.h
 			ascend/DX12/SwapChain.h
 			ascend/DX12/SwapChain.cpp
-			ascend/DX12/PCH.h
-			ascend/DX12/DDSTextureLoader12.cpp
-			ascend/DX12/DDSTextureLoader12.h
 			ascend/DX12/Textures.cpp
 			ascend/DX12/Textures.h
 			ascend/imgui/imconfig.h
@@ -72,8 +76,8 @@ set(SOURCES ascend/main.cpp
 # TODO: Move to .cmake file for shader compiling - Reduce code duplication.
 set(HLSL_LIB_SHADER_FILES ascend/Shader/WorkGraphRaytracing.hlsl)
 set(HLSL_CS_SHADER_FILES  ascend/Shader/ComputeRaytracing.hlsl)
-set(HLSL_VS_SHADER_FILES ascend/Shader/RasterVS.hlsl)
-set(HLSL_PS_SHADER_FILES ascend/Shader/RasterPS.hlsl)
+set(HLSL_VS_SHADER_FILES ascend/Shader/RasterVS.hlsl ascend/Shader/IMGuiVS.hlsl)
+set(HLSL_PS_SHADER_FILES ascend/Shader/RasterPS.hlsl ascend/Shader/IMGuiPS.hlsl)
 set(SHADER_FILES ${HLSL_LIB_SHADER_FILES} 					  
 				 ${HLSL_CS_SHADER_FILES}
 				 ${HLSL_VS_SHADER_FILES}

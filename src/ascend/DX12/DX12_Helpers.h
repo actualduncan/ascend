@@ -9,7 +9,7 @@ using Microsoft::WRL::ComPtr;
 
 void VerifyD3D12Result(HRESULT D3DResult, const char* code, const char* Filename, INT32 Line);
 
-
+std::wstring s2ws(const std::string& str);
 #define VERIFYD3D12RESULT(x) \
 { \
 	HRESULT hr = x; \

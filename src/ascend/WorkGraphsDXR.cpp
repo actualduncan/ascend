@@ -54,7 +54,8 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 
 	m_depthStencilBuffer.Create(L"ZBuffer", DXGI_FORMAT_D32_FLOAT_S8X24_UINT ,m_width, m_height);
 	m_rayTraceConstantBuffer.Create(L"Constant Buffer", sizeof(RayTraceConstants));
-
+	m_imgui = std::make_unique<IMGUI_Helper>(hwnd);
+	m_imgui->InitWin32DX12();
 	if (false)
 	{
 		LoadRasterAssets();
@@ -66,6 +67,7 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 		LoadRasterAssets();
 		LoadComputeAssets();
 	}
+	m_imgui->CreatePSO();
 
 	DX12::WaitForGPU();
 	CreateRaytracingInterfaces();
@@ -76,68 +78,9 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	LoadModels();
 }
 
-// why is this floating about
-std::vector<std::unique_ptr<Texture>> textures;
-D3D12_GPU_DESCRIPTOR_HANDLE texhandle;
 void WorkGraphsDXR::LoadModels()
 {
-	// make better texture manager for sponza
 	m_sponza = std::make_unique<Model>("debug/res/sponza.obj", "debug/res/textures/");
-	
-	/*
-	textures.push_back(std::make_unique<Texture>(0, L"debug/res/textures/empty.dds"));
-	textures.push_back(std::make_unique<Texture>(1, L"debug/res/textures/Sponza_Thorn_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(3, L"debug/res/textures/VasePlant_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(2, L"debug/res/textures/VaseRound_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(4, L"debug/res/textures/Background_Albedo.dds"));
-	textures.push_back(std::make_unique<Texture>(5, L"debug/res/textures/Sponza_Bricks_a_Albedo.dds"));
-	textures.push_back(std::make_unique<Texture>(6, L"debug/res/textures/Sponza_Arch_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(7, L"debug/res/textures/Sponza_Ceiling_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(8, L"debug/res/textures/Sponza_Column_a_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(9, L"debug/res/textures/Sponza_Floor_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(10, L"debug/res/textures/Sponza_Column_c_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(11, L"debug/res/textures/Sponza_Details_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(12, L"debug/res/textures/Sponza_Column_b_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(13, L"debug/res/textures/empty.dds"));
-	textures.push_back(std::make_unique<Texture>(14, L"debug/res/textures/Sponza_FlagPole_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(15, L"debug/res/textures/Sponza_Fabric_Green_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(16, L"debug/res/textures/Sponza_Fabric_Blue_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(17, L"debug/res/textures/Sponza_Fabric_Red_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(18, L"debug/res/textures/Sponza_Curtain_Blue_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(19, L"debug/res/textures/Sponza_Curtain_Green_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(20, L"debug/res/textures/Sponza_Curtain_Red_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(21, L"debug/res/textures/ChainTexture_Albedo.dds"));
-	textures.push_back(std::make_unique<Texture>(22, L"debug/res/textures/VaseHanging_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(23, L"debug/res/textures/Vase_diffuse.dds"));
-	textures.push_back(std::make_unique<Texture>(24, L"debug/res/textures/Lion_Albedo.dds"));
-	textures.push_back(std::make_unique<Texture>(25, L"debug/res/textures/Sponza_Roof_diffuse.dds"));
-	
-	textures.push_back(std::make_unique<Texture>(1+25, L"debug/res/textures/Sponza_Thorn_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(3+25, L"debug/res/textures/VasePlant_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(2+25, L"debug/res/textures/VaseRound_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(4+25, L"debug/res/textures/Background_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(5+25, L"debug/res/textures/Sponza_Bricks_a_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(6+25, L"debug/res/textures/Sponza_Arch_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(7+25, L"debug/res/textures/Sponza_Ceiling_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(8+25, L"debug/res/textures/Sponza_Column_a_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(9+25, L"debug/res/textures/Sponza_Floor_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(10+25, L"debug/res/textures/Sponza_Column_c_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(11+25, L"debug/res/textures/Sponza_Details_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(12+25, L"debug/res/textures/Sponza_Column_b_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(13+25, L"debug/res/textures/empty.dds"));
-	textures.push_back(std::make_unique<Texture>(14+25, L"debug/res/textures/Sponza_FlagPole_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(15+25, L"debug/res/textures/Sponza_Fabric_Green_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(16+25, L"debug/res/textures/Sponza_Fabric_Blue_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(17+25, L"debug/res/textures/Sponza_Fabric_Red_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(18+25, L"debug/res/textures/Sponza_Curtain_Blue_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(19+25, L"debug/res/textures/Sponza_Curtain_Green_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(20+25, L"debug/res/textures/Sponza_Curtain_Red_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(21+25, L"debug/res/textures/ChainTexture_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(22+25, L"debug/res/textures/VaseHanging_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(23+25, L"debug/res/textures/Vase_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(24+25, L"debug/res/textures/Lion_Normal.dds"));
-	textures.push_back(std::make_unique<Texture>(25+25, L"debug/res/textures/Sponza_Roof_Normal.dds"));
-	*/
 }
 
 void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
@@ -167,6 +110,7 @@ void WorkGraphsDXR::Render()
 	DX12::StartFrame();
 	m_swapChain.StartFrame();
 
+
 	if (m_shouldBuildAccelerationStructures)
 	{
 		BuildAccelerationStructuresForCompute();
@@ -187,14 +131,18 @@ void WorkGraphsDXR::Render()
 		CopyComputeOutputToBackBuffer();
 	}
 
+	ImGui();
 
 	m_swapChain.EndFrame();
 	DX12::EndFrame(m_swapChain.GetD3DObject());
 }
 
-void WorkGraphsDXR::ImGUI()
+void WorkGraphsDXR::ImGui()
 {
-
+	m_imgui->StartFrame();
+	// put imgui interface code here
+	ImGui::ShowDemoWindow();
+	m_imgui->EndFrame();
 }
 
 void WorkGraphsDXR::CreateWorkGraph()
@@ -297,23 +245,12 @@ void WorkGraphsDXR::CreateWorkGraphRootSignature()
 		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
 			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_workGraphOutput)));
-		auto uavDesc2 = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
-			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
-
 		
 		DescriptorAllocation alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
 		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
 		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
 		DX12::Device->CreateUnorderedAccessView(m_workGraphOutput.Get(), nullptr, &UAVDesc, alloc.Handle);
 		m_workGraphOutputUavDescriptorHandle = alloc.GPUHandle;
-
-		
-		alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
-		UAVDesc = {};
-		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
-		DX12::Device->CreateUnorderedAccessView(m_normalTex.Get(), nullptr, &UAVDesc, alloc.Handle);
-		m_normHandle = alloc.GPUHandle;
 	}
 }
 
@@ -354,14 +291,14 @@ void WorkGraphsDXR::CopyRasterOutputToWorkGraphInput()
 {
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
-	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_gBuffer.m_normalMap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
 	DX12::GraphicsCmdList->CopyResource(m_workGraphOutput.Get(), m_swapChain.BackBuffer());
-	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_normalTexRTV.Get());
+	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_gBuffer.m_normalMap.Get());
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_workGraphOutput.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
 
-	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_gBuffer.m_normalMap.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
 
 }
@@ -370,14 +307,14 @@ void WorkGraphsDXR::CopyRasterOutputToComputeInput()
 {
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
-	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_gBuffer.m_normalMap.Get(), D3D12_RESOURCE_STATE_RENDER_TARGET, D3D12_RESOURCE_STATE_COPY_SOURCE, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_UNORDERED_ACCESS, D3D12_RESOURCE_STATE_COPY_DEST, 0);
 	DX12::GraphicsCmdList->CopyResource(m_computeOutput.Get(), m_swapChain.BackBuffer());
-	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_normalTexRTV.Get());
+	DX12::GraphicsCmdList->CopyResource(m_normalTex.Get(), m_gBuffer.m_normalMap.Get());
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_swapChain.BackBuffer(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_computeOutput.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
 
-	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTexRTV.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
+	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_gBuffer.m_normalMap.Get(), D3D12_RESOURCE_STATE_COPY_SOURCE, D3D12_RESOURCE_STATE_RENDER_TARGET, 0);
 	DX12::TransitionResource(DX12::GraphicsCmdList.Get(), m_normalTex.Get(), D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, 0);
 
 }
@@ -550,17 +487,13 @@ void WorkGraphsDXR::LoadComputeAssets()
 		NAME_D3D12_OBJECT(m_computePipelineState);
 	}
 
-
-
 	{
 		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
 
 		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
 			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_computeOutput)));
-		auto uavDesc2 = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
-		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
-			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc2, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
+
 
 		m_computeOutput->SetName(L"Compute Output");
 		DescriptorAllocation alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
@@ -570,20 +503,12 @@ void WorkGraphsDXR::LoadComputeAssets()
 		DX12::Device->CreateUnorderedAccessView(m_computeOutput.Get(), nullptr, &UAVDesc, alloc.Handle);
 		
 		m_computeOutputUavDescriptorHandle = alloc.GPUHandle;
-
-		alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
-
-		DX12::Device->CreateUnorderedAccessView(m_normalTex.Get(), nullptr, &UAVDesc, alloc.Handle);
-
-		m_normHandle = alloc.GPUHandle;
-
 	}
 }
 
 void WorkGraphsDXR::DoCompute()
 {
 	DX12::GraphicsCmdList->SetPipelineState(m_computePipelineState.Get());
-	//D3D12_DISPATCH_RAYS_DESC dispatchDesc = {};
 	DX12::GraphicsCmdList->SetDescriptorHeaps(1, DX12::UAVDescriptorHeap.Heap.GetAddressOf());
 	DX12::GraphicsCmdList->SetComputeRootSignature(m_computeRootSignature.Get());
 	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::OutputViewSlot, m_computeOutputUavDescriptorHandle);
@@ -635,20 +560,11 @@ void WorkGraphsDXR::LoadRasterAssets()
 		sampler.ShaderVisibility = D3D12_SHADER_VISIBILITY_PIXEL;
 		CD3DX12_VERSIONED_ROOT_SIGNATURE_DESC rootSignatureDesc(ARRAYSIZE(rootParameters), rootParameters, 1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT);
 		VERIFYD3D12RESULT(D3DX12SerializeVersionedRootSignature(&rootSignatureDesc, D3D_ROOT_SIGNATURE_VERSION_1_1, &signature, &error));
-		VERIFYD3D12RESULT(DX12::Device ->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rasterRootSignature)));
+		VERIFYD3D12RESULT(DX12::Device->CreateRootSignature(0, signature->GetBufferPointer(), signature->GetBufferSize(), IID_PPV_ARGS(&m_rasterRootSignature)));
 	}
 
 	// Create the pipeline state, which includes compiling and loading shaders.
 	{
-		ComPtr<ID3DBlob> vertexShader;
-		ComPtr<ID3DBlob> pixelShader;
-
-#if defined(_DEBUG)
-		// Enable better shader debugging with the graphics debugging tools.
-		UINT compileFlags = D3DCOMPILE_DEBUG | D3DCOMPILE_SKIP_OPTIMIZATION;
-#else
-		UINT compileFlags = 0;
-#endif
 		// Define the vertex input layout.
 		D3D12_INPUT_ELEMENT_DESC inputElementDescs[] =
 		{
@@ -674,9 +590,11 @@ void WorkGraphsDXR::LoadRasterAssets()
 		psoDesc.DepthStencilState.StencilEnable = FALSE;
 		psoDesc.SampleMask = UINT_MAX;
 		psoDesc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-		psoDesc.NumRenderTargets = 2;
+		psoDesc.NumRenderTargets = 4;
 		psoDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psoDesc.RTVFormats[1] = DXGI_FORMAT_R8G8B8A8_SNORM;
+		psoDesc.RTVFormats[2] = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		psoDesc.RTVFormats[3] = DXGI_FORMAT_R8G8B8A8_UNORM;
 		psoDesc.SampleDesc.Count = 1;
 
 		D3D12_GRAPHICS_PIPELINE_STATE_DESC transparentPso = psoDesc;
@@ -701,6 +619,25 @@ void WorkGraphsDXR::LoadRasterAssets()
 		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&psoDesc, IID_PPV_ARGS(&m_rasterPipelineState)));
 		VERIFYD3D12RESULT(DX12::Device->CreateGraphicsPipelineState(&transparentPso, IID_PPV_ARGS(&m_transparentPipelineState)));
 
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		auto uavDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &uavDesc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&m_normalTex)));
+
+		DescriptorAllocation alloc = DX12::UAVDescriptorHeap.AllocateDescriptor();
+		D3D12_UNORDERED_ACCESS_VIEW_DESC UAVDesc = {};
+		UAVDesc.ViewDimension = D3D12_UAV_DIMENSION_TEXTURE2D;
+		DX12::Device->CreateUnorderedAccessView(m_normalTex.Get(), nullptr, &UAVDesc, alloc.Handle);
+		m_normHandle = alloc.GPUHandle;
+
+		InitGBuffer();
+	}
+}
+
+void WorkGraphsDXR::InitGBuffer()
+{
+	// normal
+	{
 		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_SNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
 
 		float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
@@ -714,7 +651,7 @@ void WorkGraphsDXR::LoadRasterAssets()
 
 		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
-			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &optClear, IID_PPV_ARGS(&m_normalTexRTV)));
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &optClear, IID_PPV_ARGS(&m_gBuffer.m_normalMap)));
 
 
 		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
@@ -723,15 +660,74 @@ void WorkGraphsDXR::LoadRasterAssets()
 		rtvDesc.Texture2D.MipSlice = 0;
 		rtvDesc.Texture2D.PlaneSlice = 0;
 
+		DescriptorAllocation alloc = DX12::RTVDescriptorHeap.AllocateDescriptor();
+		DX12::Device->CreateRenderTargetView(m_gBuffer.m_normalMap.Get(), &rtvDesc, alloc.Handle);
+		m_gBuffer.normalMapHandle = alloc.Handle;
+
+	}
+	
+	{
+		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R32G32B32A32_FLOAT, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+
+		float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+		D3D12_CLEAR_VALUE optClear = {};
+		optClear.Color[0] = 0.0f;
+		optClear.Color[1] = 0.2f;
+		optClear.Color[2] = 0.4f;
+		optClear.Color[3] = 1.0f;
+
+		optClear.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &optClear, IID_PPV_ARGS(&m_gBuffer.m_worldSpacePosition)));
+
+
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtvDesc.Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
+		rtvDesc.Texture2D.MipSlice = 0;
+		rtvDesc.Texture2D.PlaneSlice = 0;
 
 		DescriptorAllocation alloc = DX12::RTVDescriptorHeap.AllocateDescriptor();
-		DX12::Device->CreateRenderTargetView(m_normalTexRTV.Get(), &rtvDesc, alloc.Handle);
-		m_normRTVHandle = alloc.Handle;
+		DX12::Device->CreateRenderTargetView(m_gBuffer.m_worldSpacePosition.Get(), &rtvDesc, alloc.Handle);
+		m_gBuffer.worldSpaceHandle = alloc.Handle;
+
 	}
+
+	{
+		auto bDesc = CD3DX12_RESOURCE_DESC::Tex2D(DXGI_FORMAT_R8G8B8A8_UNORM, m_width, m_height, 1, 1, 1, 0, D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET);
+
+		float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
+		D3D12_CLEAR_VALUE optClear = {};
+		optClear.Color[0] = 0.0f;
+		optClear.Color[1] = 0.2f;
+		optClear.Color[2] = 0.4f;
+		optClear.Color[3] = 1.0f;
+
+		optClear.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+
+		auto defaultHeapProperties = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_DEFAULT);
+		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
+			&defaultHeapProperties, D3D12_HEAP_FLAG_NONE, &bDesc, D3D12_RESOURCE_STATE_RENDER_TARGET, &optClear, IID_PPV_ARGS(&m_gBuffer.m_materialId)));
+
+
+		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc = {};
+		rtvDesc.ViewDimension = D3D12_RTV_DIMENSION_TEXTURE2D;
+		rtvDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
+		rtvDesc.Texture2D.MipSlice = 0;
+		rtvDesc.Texture2D.PlaneSlice = 0;
+
+		DescriptorAllocation alloc = DX12::RTVDescriptorHeap.AllocateDescriptor();
+		DX12::Device->CreateRenderTargetView(m_gBuffer.m_materialId.Get(), &rtvDesc, alloc.Handle);
+		m_gBuffer.materialHandle = alloc.Handle;
+
+	}
+	
 }
+
 void WorkGraphsDXR::DoRaster()
 {
-
 	DX12::GraphicsCmdList->SetPipelineState(m_rasterPipelineState.Get());
 	DX12::GraphicsCmdList->SetGraphicsRootSignature(m_rasterRootSignature.Get());
 	DX12::GraphicsCmdList->SetGraphicsRootConstantBufferView(2, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
@@ -740,17 +736,21 @@ void WorkGraphsDXR::DoRaster()
 	DX12::GraphicsCmdList->RSSetScissorRects(1, &m_scissorRect);
 
 
-	CD3DX12_CPU_DESCRIPTOR_HANDLE rtvHandles[2];
+	D3D12_CPU_DESCRIPTOR_HANDLE rtvHandles[4];
 	rtvHandles[0] = DX12::RTVDescriptorHeap.CPUHandleFromIndex(m_swapChain.GetD3DObject()->GetCurrentBackBufferIndex(), 0);
-	rtvHandles[1] = m_normRTVHandle;
+	rtvHandles[1] = m_gBuffer.normalMapHandle;
+	rtvHandles[2] = m_gBuffer.worldSpaceHandle;
+	rtvHandles[3] = m_gBuffer.materialHandle;
 	D3D12_CPU_DESCRIPTOR_HANDLE dsvHandle = DX12::DSVDescriptorHeap.CPUHandleFromIndex(m_depthStencilBuffer.resourceIdx, 0);
-	DX12::GraphicsCmdList->OMSetRenderTargets(2, rtvHandles, FALSE, &dsvHandle);
+	DX12::GraphicsCmdList->OMSetRenderTargets(4, rtvHandles, FALSE, &dsvHandle);
 	DX12::GraphicsCmdList->OMSetStencilRef(1);
 	DX12::GraphicsCmdList->ClearDepthStencilView(DX12::DSVDescriptorHeap.CPUHandleFromIndex(m_depthStencilBuffer.resourceIdx,0), D3D12_CLEAR_FLAG_DEPTH, 0.0f, 0, 0, NULL);
 	// Record commands.
 	const float clearColor[] = { 0.0f, 0.2f, 0.4f, 1.0f };
 	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[0], clearColor, 0, nullptr);
 	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[1], clearColor, 0, nullptr);
+	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[2], clearColor, 0, nullptr);
+	DX12::GraphicsCmdList->ClearRenderTargetView(rtvHandles[3], clearColor, 0, nullptr);
 	const uint64_t modelMeshCount = m_sponza->GetModelMeshVector().size();
 	for (int i = 0; i < modelMeshCount; ++i)
 	{

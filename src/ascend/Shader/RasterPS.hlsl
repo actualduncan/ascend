@@ -11,7 +11,7 @@ struct PSInput
 {
     float4 position : SV_POSITION;
     float4 normal : NORMAL;
-    float3 tangent : TANGENT;
+    float4 tangent : TANGENT;
     float3 bitTangent : BITTANGENT;
     float2 uv : TEXCOORD;
 };
@@ -19,6 +19,8 @@ struct PSOutput
 {
     float4 Color : SV_TARGET0;
     float4 Normal : SV_Target1;
+    float4 WorldSpace : SV_Target2;
+    float4 Material : SV_Target3;
 };
 float magnitude(float3 _vector)
 {
@@ -67,6 +69,7 @@ PSOutput PSMain(PSInput input)
     PSOutput output;
     output.Color = g_texture.Sample(g_sampler, input.uv) * float4(1, 1, 1, 1); //Set first output
     output.Normal = float4(recalculateNormals(input.normal.xyz, bumpMap.xyz), 1.0f); //Set second output
-
+    output.WorldSpace = float4(input.tangent.x / input.tangent.w, 0, 0, 0);
+    output.Material = float4(0, 0, 0, 0);
     return output;
 }

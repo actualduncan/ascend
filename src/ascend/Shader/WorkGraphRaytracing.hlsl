@@ -40,6 +40,7 @@ float4 CalculateDiffuseLighting(float3 hitPosition, float3 normal)
 
 RWTexture2D<float4> RenderTarget : register(u0);
 RWTexture2D<float4> Normals : register(u1);
+RWTexture2D<float> Depth : register(u2);
 RaytracingAccelerationStructure Scene : register(t0, space0);
 
 [Shader("node")]

@@ -2,6 +2,8 @@
 #include "Model.h"
 #include "Camera.h"
 #include "InputCommands.h"
+#include "GBuffer.h"
+#include "IMGuiHelper.h"
 struct RayTraceConstants
 {
 	//XMFLOAT4X4 InvViewProjection;
@@ -23,15 +25,17 @@ public:
 	void LoadModels();
 	void Update(float dt, InputCommands* inputCommands);
 	void Render();
-	void ImGUI();
+	void ImGui();
+	void InitGBuffer();
 
 private:
+	std::unique_ptr<IMGUI_Helper> m_imgui;
 	SwapChain m_swapChain;
+	GBuffer m_gBuffer;
 	DepthStencilBuffer m_depthStencilBuffer;
 	ComPtr<ID3D12Resource> m_indexBuffer;
 	ComPtr<ID3D12Resource> m_vertexBuffer;
 	ComPtr<ID3D12Resource> m_normalTex;
-	ComPtr<ID3D12Resource> m_normalTexRTV;
 	ConstantBuffer m_rayTraceConstantBuffer;
 	RayTraceConstants m_constantBufferData;
 
@@ -50,7 +54,7 @@ private:
 	std::uint32_t             m_workGraphEntryPointIndex;
 	D3D12_GPU_DESCRIPTOR_HANDLE m_workGraphOutputUavDescriptorHandle;
 	D3D12_GPU_DESCRIPTOR_HANDLE m_normHandle;
-	D3D12_CPU_DESCRIPTOR_HANDLE m_normRTVHandle;
+
 	UINT m_workGraphOutputUavDescriptorIndex;
 	UINT m_workGraphDescriptorSize;
 
