@@ -20,6 +20,7 @@ namespace DX12
 		heapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
 
 		VERIFYD3D12RESULT(DX12::Device->CreateQueryHeap(&heapDesc, IID_PPV_ARGS(&m_timestampQueryHeap)));
+		m_timestampQueryHeap->SetName(L"Timestamp Query Heap");
 	}
 
 	void Profiler::StartTimestampQuery()

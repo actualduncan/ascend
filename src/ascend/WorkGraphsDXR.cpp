@@ -56,6 +56,7 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_rayTraceConstantBuffer.Create(L"Constant Buffer", sizeof(RayTraceConstants));
 	m_imgui = std::make_unique<IMGUI_Helper>(hwnd);
 	m_imgui->InitWin32DX12();
+
 	m_gpuProfiler = std::make_unique<DX12::Profiler>();
 	m_gpuProfiler->Init();
 	if (true)
