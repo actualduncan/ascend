@@ -1,4 +1,5 @@
 #include "DX12/SwapChain.h"
+#include "DX12/DX12Profiler.h"
 #include "Model.h"
 #include "Camera.h"
 #include "InputCommands.h"
@@ -30,6 +31,7 @@ public:
 
 private:
 	std::unique_ptr<IMGUI_Helper> m_imgui;
+	std::unique_ptr<DX12::Profiler> m_gpuProfiler;
 	SwapChain m_swapChain;
 	GBuffer m_gBuffer;
 	DepthStencilBuffer m_depthStencilBuffer;
