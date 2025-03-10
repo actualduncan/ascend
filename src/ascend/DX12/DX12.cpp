@@ -38,6 +38,8 @@ namespace DX12
 	DescriptorHeap RTVDescriptorHeap;
 	DescriptorHeap UAVDescriptorHeap;
 	DescriptorHeap DSVDescriptorHeap;
+	
+	Profiler GPUProfiler;
 
 	void Initialize(D3D_FEATURE_LEVEL minFeatureLevel)
 	{
@@ -50,6 +52,7 @@ namespace DX12
 		DXGI_ADAPTER_DESC1 desc = {};
 		Adapter.Get()->GetDesc1(&desc);
 
+		
 #if DEBUG
 		ComPtr<ID3D12Debug1> debugController;
 
@@ -118,6 +121,7 @@ namespace DX12
 
 		RTVDescriptorSize = RTVDescriptorHeap.DescriptorSize;
 
+		GPUProfiler.Init(desc);
 	}
 
 	void StartFrame()
@@ -127,6 +131,7 @@ namespace DX12
 
 	void EndFrame(IDXGISwapChain4* swapChain)
 	{
+		
 		// Close cmd list now that 
 		VERIFYD3D12RESULT(GraphicsCmdList->Close());
 

@@ -1,7 +1,7 @@
 #include "WorkGraphsDXR.h"
 #include "DX12/DX12.h"
 #include "DX12/DX12_Helpers.h"
-
+#include "DX12/DX12Profiler.h"
 #include <d3dcompiler.h>
 #include "Shader/CompiledShaders/WorkGraphRaytracing.hlsl.h"
 #include "Shader/CompiledShaders/ComputeRaytracing.hlsl.h"
@@ -57,22 +57,26 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_imgui = std::make_unique<IMGUI_Helper>(hwnd);
 	m_imgui->InitWin32DX12();
 
-	m_gpuProfiler = std::make_unique<DX12::Profiler>();
-	m_gpuProfiler->Init();
+
 	if (true)
 	{
 		LoadRasterAssets();
+		DX12::GPUProfiler.StartMemoryQuery("WorkGraph");
 		CreateWorkGraphRootSignature();
 		CreateWorkGraph();
+		DX12::GPUProfiler.EndMemoryQuery("WorkGraph");
+
 	}
 	else
 	{
 		LoadRasterAssets();
 		LoadComputeAssets();
 	}
+
 	m_imgui->CreatePSO();
 
 	DX12::WaitForGPU();
+
 	CreateRaytracingInterfaces();
 
 	float aspectRatio = float(width) / float(height);
@@ -111,20 +115,30 @@ void WorkGraphsDXR::Render()
 	// update constant buffers
 
 	DX12::StartFrame();
+
+	DX12::GPUProfiler.StartTimestampQuery("Frame");
+
 	m_swapChain.StartFrame();
 
 
 	if (m_shouldBuildAccelerationStructures)
 	{
+		DX12::GPUProfiler.StartMemoryQuery("AccelStruct");
 		BuildAccelerationStructuresForCompute();
+		DX12::GPUProfiler.EndMemoryQuery("AccelStruct");
 	}
 
 	if (true)
 	{
+		DX12::GPUProfiler.StartTimestampQuery("Raster");
 		DoRaster();
+		DX12::GPUProfiler.EndTimestampQuery("Raster");
 		CopyRasterOutputToWorkGraphInput();
+
+		DX12::GPUProfiler.StartTimestampQuery("WorkGraph");
 		DispatchWorkGraph();
 		CopyWorkGraphOutputToBackBuffer();
+		DX12::GPUProfiler.EndTimestampQuery("WorkGraph");
 	}
 	else
 	{
@@ -133,10 +147,13 @@ void WorkGraphsDXR::Render()
 		DoCompute();
 		CopyComputeOutputToBackBuffer();
 	}
-	m_gpuProfiler->EndTimestampQuery();
+
+	DX12::GPUProfiler.EndTimestampQuery("Frame");
+
 	ImGui();
 
 	m_swapChain.EndFrame();
+
 	DX12::EndFrame(m_swapChain.GetD3DObject());
 }
 
@@ -144,7 +161,28 @@ void WorkGraphsDXR::ImGui()
 {
 	m_imgui->StartFrame();
 	// put imgui interface code here
-	ImGui::ShowDemoWindow();
+	DX12::GPUProfiler.CollectTimingData();
+	std::string Frame = std::string("Frame: ");
+	std::string Raster = std::string("Raster: ");
+	std::string WorkGraph = std::string("WorkGraph: ");
+	std::string WorkGraphMem = std::string("WorkGraph Mem: ");
+	std::string Model = std::string("Texture Mem: ");
+	std::string AccelStruct = std::string("AccelStruct Mem: ");
+	Frame += std::to_string(DX12::GPUProfiler.GetFrametime("Frame"));
+	Raster += std::to_string(DX12::GPUProfiler.GetFrametime("Raster"));
+	WorkGraph += std::to_string(DX12::GPUProfiler.GetFrametime("WorkGraph"));
+	WorkGraphMem += std::to_string(DX12::GPUProfiler.GetMemoryUsage("WorkGraph"));
+	Model += std::to_string(DX12::GPUProfiler.GetMemoryUsage("Model"));
+	AccelStruct += std::to_string(DX12::GPUProfiler.GetMemoryUsage("AccelStruct"));
+	ImGui::Begin("Test");
+	ImGui::Text(Frame.c_str());
+	ImGui::Text(Raster.c_str());
+	ImGui::Text(WorkGraph.c_str());
+	ImGui::Text(WorkGraphMem.c_str());
+	ImGui::Text(Model.c_str());
+	ImGui::Text(AccelStruct.c_str());
+	ImGui::ArrowButton("e", ImGuiDir_Left);
+	ImGui::End();
 	m_imgui->EndFrame();
 }
 
