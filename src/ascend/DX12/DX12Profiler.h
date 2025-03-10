@@ -18,13 +18,14 @@ namespace DX12
 		void StartMemoryQuery(std::string name);
 		void EndMemoryQuery(std::string name);
 		double GetMemoryUsage(std::string name);
+		double GetCurrentTotalMemoryUsage();
 	private:
 		ComPtr<ID3D12QueryHeap> m_timestampQueryHeap;
 		ComPtr<ID3D12Resource> m_resultBuffer;
 		ComPtr<IDXGIAdapter3> m_adapter;
 		uint64_t m_timestampFrequency;
-		std::map<std::string, uint32_t> m_timestampMarkers;
-		std::map<std::string, uint32_t> m_memoryMarkers;
+		std::map<std::string, uint64_t> m_timestampMarkers;
+		std::map<std::string, uint64_t> m_memoryMarkers;
 		UINT64* data;
 		int profileHeaps = 0;
 

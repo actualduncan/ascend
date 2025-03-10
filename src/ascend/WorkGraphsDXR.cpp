@@ -168,12 +168,14 @@ void WorkGraphsDXR::ImGui()
 	std::string WorkGraphMem = std::string("WorkGraph Mem: ");
 	std::string Model = std::string("Texture Mem: ");
 	std::string AccelStruct = std::string("AccelStruct Mem: ");
+	std::string TotalMemory = std::string("Total Mem: ");
 	Frame += std::to_string(DX12::GPUProfiler.GetFrametime("Frame"));
 	Raster += std::to_string(DX12::GPUProfiler.GetFrametime("Raster"));
 	WorkGraph += std::to_string(DX12::GPUProfiler.GetFrametime("WorkGraph"));
 	WorkGraphMem += std::to_string(DX12::GPUProfiler.GetMemoryUsage("WorkGraph"));
 	Model += std::to_string(DX12::GPUProfiler.GetMemoryUsage("Model"));
 	AccelStruct += std::to_string(DX12::GPUProfiler.GetMemoryUsage("AccelStruct"));
+	TotalMemory += std::to_string(DX12::GPUProfiler.GetCurrentTotalMemoryUsage());
 	ImGui::Begin("Test");
 	ImGui::Text(Frame.c_str());
 	ImGui::Text(Raster.c_str());
@@ -181,6 +183,7 @@ void WorkGraphsDXR::ImGui()
 	ImGui::Text(WorkGraphMem.c_str());
 	ImGui::Text(Model.c_str());
 	ImGui::Text(AccelStruct.c_str());
+	ImGui::Text(TotalMemory.c_str());
 	ImGui::ArrowButton("e", ImGuiDir_Left);
 	ImGui::End();
 	m_imgui->EndFrame();

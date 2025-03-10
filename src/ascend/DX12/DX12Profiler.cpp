@@ -19,7 +19,7 @@ namespace DX12
 		systemMem = desc.DedicatedSystemMemory;
 		videoMem = desc.DedicatedVideoMemory;
 		adapterinfo = desc.Description;
-		
+
 		// for memory usage queries
 		VERIFYD3D12RESULT(Factory->EnumAdapterByLuid(desc.AdapterLuid, IID_PPV_ARGS(&m_adapter)));
 
@@ -32,7 +32,7 @@ namespace DX12
 		m_timestampQueryHeap->SetName(L"Timestamp Query Heap");
 		auto readback = CD3DX12_HEAP_PROPERTIES(D3D12_HEAP_TYPE_READBACK);
 
-		auto timestamp = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT64)*heapDesc.Count);
+		auto timestamp = CD3DX12_RESOURCE_DESC::Buffer(sizeof(UINT64) * heapDesc.Count);
 		VERIFYD3D12RESULT(DX12::Device->CreateCommittedResource(
 			&readback, D3D12_HEAP_FLAG_NONE, &timestamp, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&m_resultBuffer)));
 		DX12::GraphicsQueue->GetTimestampFrequency(&m_timestampFrequency);
@@ -133,6 +133,13 @@ namespace DX12
 			return 0.0;
 		}
 
-		return ((double)m_memoryMarkers[end] - (double)m_memoryMarkers[begin]) / 1024 / 1024;;
+		return ((double)m_memoryMarkers[end] - (double)m_memoryMarkers[begin]) / 1024 / 1024;
+	}
+
+	double Profiler::GetCurrentTotalMemoryUsage()
+	{
+		DXGI_QUERY_VIDEO_MEMORY_INFO mInfo = {};
+		m_adapter->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &mInfo);
+		return (double)mInfo.CurrentUsage / 1024 / 1024;
 	}
 }
