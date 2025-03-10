@@ -55,6 +55,8 @@ set(SOURCES ascend/main.cpp
 			ascend/DX12/SwapChain.cpp
 			ascend/DX12/Textures.cpp
 			ascend/DX12/Textures.h
+			ascend/DX12/DX12Profiler.cpp
+			ascend/DX12/DX12Profiler.h
 			ascend/imgui/imconfig.h
 			ascend/imgui/imgui.cpp
 			ascend/imgui/imgui.h

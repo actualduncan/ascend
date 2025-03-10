@@ -42,7 +42,7 @@ RWTexture2D<float4> RenderTarget : register(u0);
 RWTexture2D<float4> Normals : register(u1);
 RaytracingAccelerationStructure Scene : register(t0, space0);
 
-[numthreads(1, 1, 1)]
+[numthreads(8, 8, 1)]
 void CSMain(uint3 DTid : SV_DispatchThreadID)
 {
     RayDesc ray;

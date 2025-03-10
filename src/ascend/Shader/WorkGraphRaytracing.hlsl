@@ -47,7 +47,7 @@ RaytracingAccelerationStructure Scene : register(t0, space0);
 [NodeLaunch("broadcasting")]
 [NodeIsProgramEntry]
 [NodeDispatchGrid(1, 1, 1)] // This will be overridden during pipeline creation
-[numthreads(1, 1, 1)]
+[numthreads(8, 8, 1)]
 void EntryFunction(uint3 DTid : SV_DispatchThreadID)
 {
     RayDesc ray;

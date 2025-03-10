@@ -1,7 +1,7 @@
 #include "WorkGraphsDXR.h"
 #include "DX12/DX12.h"
 #include "DX12/DX12_Helpers.h"
-
+#include "DX12/DX12Profiler.h"
 #include <d3dcompiler.h>
 #include "Shader/CompiledShaders/WorkGraphRaytracing.hlsl.h"
 #include "Shader/CompiledShaders/ComputeRaytracing.hlsl.h"
@@ -56,20 +56,27 @@ void WorkGraphsDXR::Initialize(HWND hwnd, uint32_t width, uint32_t height)
 	m_rayTraceConstantBuffer.Create(L"Constant Buffer", sizeof(RayTraceConstants));
 	m_imgui = std::make_unique<IMGUI_Helper>(hwnd);
 	m_imgui->InitWin32DX12();
-	if (false)
+
+
+	if (true)
 	{
 		LoadRasterAssets();
+		DX12::GPUProfiler.StartMemoryQuery("WorkGraph");
 		CreateWorkGraphRootSignature();
 		CreateWorkGraph();
+		DX12::GPUProfiler.EndMemoryQuery("WorkGraph");
+
 	}
 	else
 	{
 		LoadRasterAssets();
 		LoadComputeAssets();
 	}
+
 	m_imgui->CreatePSO();
 
 	DX12::WaitForGPU();
+
 	CreateRaytracingInterfaces();
 
 	float aspectRatio = float(width) / float(height);
@@ -108,20 +115,30 @@ void WorkGraphsDXR::Render()
 	// update constant buffers
 
 	DX12::StartFrame();
+
+	DX12::GPUProfiler.StartTimestampQuery("Frame");
+
 	m_swapChain.StartFrame();
 
 
 	if (m_shouldBuildAccelerationStructures)
 	{
+		DX12::GPUProfiler.StartMemoryQuery("AccelStruct");
 		BuildAccelerationStructuresForCompute();
+		DX12::GPUProfiler.EndMemoryQuery("AccelStruct");
 	}
 
-	if (false)
+	if (true)
 	{
+		DX12::GPUProfiler.StartTimestampQuery("Raster");
 		DoRaster();
+		DX12::GPUProfiler.EndTimestampQuery("Raster");
 		CopyRasterOutputToWorkGraphInput();
+
+		DX12::GPUProfiler.StartTimestampQuery("WorkGraph");
 		DispatchWorkGraph();
 		CopyWorkGraphOutputToBackBuffer();
+		DX12::GPUProfiler.EndTimestampQuery("WorkGraph");
 	}
 	else
 	{
@@ -131,9 +148,12 @@ void WorkGraphsDXR::Render()
 		CopyComputeOutputToBackBuffer();
 	}
 
+	DX12::GPUProfiler.EndTimestampQuery("Frame");
+
 	ImGui();
 
 	m_swapChain.EndFrame();
+
 	DX12::EndFrame(m_swapChain.GetD3DObject());
 }
 
@@ -141,7 +161,31 @@ void WorkGraphsDXR::ImGui()
 {
 	m_imgui->StartFrame();
 	// put imgui interface code here
-	ImGui::ShowDemoWindow();
+	DX12::GPUProfiler.CollectTimingData();
+	std::string Frame = std::string("Frame: ");
+	std::string Raster = std::string("Raster: ");
+	std::string WorkGraph = std::string("WorkGraph: ");
+	std::string WorkGraphMem = std::string("WorkGraph Mem: ");
+	std::string Model = std::string("Texture Mem: ");
+	std::string AccelStruct = std::string("AccelStruct Mem: ");
+	std::string TotalMemory = std::string("Total Mem: ");
+	Frame += std::to_string(DX12::GPUProfiler.GetFrametime("Frame"));
+	Raster += std::to_string(DX12::GPUProfiler.GetFrametime("Raster"));
+	WorkGraph += std::to_string(DX12::GPUProfiler.GetFrametime("WorkGraph"));
+	WorkGraphMem += std::to_string(DX12::GPUProfiler.GetMemoryUsage("WorkGraph"));
+	Model += std::to_string(DX12::GPUProfiler.GetMemoryUsage("Model"));
+	AccelStruct += std::to_string(DX12::GPUProfiler.GetMemoryUsage("AccelStruct"));
+	TotalMemory += std::to_string(DX12::GPUProfiler.GetCurrentTotalMemoryUsage());
+	ImGui::Begin("Test");
+	ImGui::Text(Frame.c_str());
+	ImGui::Text(Raster.c_str());
+	ImGui::Text(WorkGraph.c_str());
+	ImGui::Text(WorkGraphMem.c_str());
+	ImGui::Text(Model.c_str());
+	ImGui::Text(AccelStruct.c_str());
+	ImGui::Text(TotalMemory.c_str());
+	ImGui::ArrowButton("e", ImGuiDir_Left);
+	ImGui::End();
 	m_imgui->EndFrame();
 }
 
@@ -159,7 +203,7 @@ void WorkGraphsDXR::CreateWorkGraph()
 	workGraphSubobject->SetProgramName(WorkGraphProgramName);
 
 	auto rootNodeDispatchGrid = workGraphSubobject->CreateBroadcastingLaunchNodeOverrides(L"EntryFunction");
-	rootNodeDispatchGrid->DispatchGrid(m_width, m_height, 1);
+	rootNodeDispatchGrid->DispatchGrid(ceil(m_width / 8), ceil(m_height / 8), 1);
 
 	// create shader library
 	auto lib = stateObjectDesc.CreateSubobject<CD3DX12_DXIL_LIBRARY_SUBOBJECT>();
@@ -515,7 +559,7 @@ void WorkGraphsDXR::DoCompute()
 	DX12::GraphicsCmdList->SetComputeRootDescriptorTable(GlobalRootSignatureParams::NormSlot, m_normHandle);
 	DX12::GraphicsCmdList->SetComputeRootShaderResourceView(GlobalRootSignatureParams::AccelerationStructureSlot, m_topLevelAccelerationStructure->GetGPUVirtualAddress());
 	DX12::GraphicsCmdList->SetComputeRootConstantBufferView(GlobalRootSignatureParams::ConstantBufferSlot, m_rayTraceConstantBuffer.GetGpuVirtualAddress());
-	DX12::GraphicsCmdList->Dispatch(m_width, m_height, 1);
+	DX12::GraphicsCmdList->Dispatch(ceil(m_width / 8), ceil(m_height / 8), 1);
 }
 
 void WorkGraphsDXR::CopyComputeOutputToBackBuffer()

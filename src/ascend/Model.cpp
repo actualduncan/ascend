@@ -75,8 +75,9 @@ void Model::ImportModel(const std::string& file, const std::string& textureDirec
 			vtxOffset += m_modelMeshes[i].numVertices;
 			idxOffset += m_modelMeshes[i].numIndices;
 		}
-
+		DX12::GPUProfiler.StartMemoryQuery("Model");
 		CreateBuffers();	
+		
 	}
 
 	const uint64_t numMaterials = scene->mNumMaterials;
@@ -106,6 +107,7 @@ void Model::ImportModel(const std::string& file, const std::string& textureDirec
 		
 	}
 	LoadTextures(textureDirectory);
+	DX12::GPUProfiler.EndMemoryQuery("Model");
 }
 
 void Model::LoadTextures(const std::string& fileDirectory)

@@ -4,9 +4,8 @@
 #include <dxgidebug.h>// include d3d
 #include <wrl.h>
 #include <DirectXMath.h>
-
-using namespace Microsoft::WRL;
-using namespace DirectX;
+#include "DX12Profiler.h"
+#include "PCH.h"
 
 struct DescriptorHeap;
 
@@ -34,6 +33,7 @@ namespace DX12
 	extern UINT64 CurrentGPUFrame;  
 	extern UINT64 CurrentFrameIdx;
 
+	extern Profiler GPUProfiler;
 
 	void Initialize(D3D_FEATURE_LEVEL featureLevel);
 
