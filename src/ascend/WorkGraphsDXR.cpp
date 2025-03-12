@@ -35,7 +35,7 @@ namespace LocalRootSignatureParams {
 WorkGraphsDXR::WorkGraphsDXR()
 	: m_shouldBuildAccelerationStructures(true)
 {
-
+	lightgui = XMFLOAT3(0.0f, 50.0f, 0.0f);
 }
 
 WorkGraphsDXR::~WorkGraphsDXR()
@@ -101,7 +101,7 @@ void WorkGraphsDXR::Update(float dt, InputCommands* inputCommands)
 	m_constantBufferData.ViewProjection = XMMatrixTranspose( viewProj);
 	m_constantBufferData.InvProjection = XMMatrixTranspose(XMMatrixInverse(nullptr,viewProj));
 	m_constantBufferData.CameraPosWS = XMFLOAT4(m_camera->GetPosition().x, m_camera->GetPosition().y, m_camera->GetPosition().z, 1.0f);
-	m_constantBufferData.LightPos = XMFLOAT4(0, 50, 0, 1.0f);
+	m_constantBufferData.LightPos = XMFLOAT4(lightgui.x, lightgui.y, lightgui.z, 1.0f);
 	m_rayTraceConstantBuffer.UpdateContents(&m_constantBufferData, sizeof(RayTraceConstants));
 
 	// imgui frame
@@ -184,7 +184,7 @@ void WorkGraphsDXR::ImGui()
 	ImGui::Text(Model.c_str());
 	ImGui::Text(AccelStruct.c_str());
 	ImGui::Text(TotalMemory.c_str());
-	ImGui::ArrowButton("e", ImGuiDir_Left);
+	ImGui::SliderFloat3("light", &lightgui.x, -500.0f, 500.0f);
 	ImGui::End();
 	m_imgui->EndFrame();
 }

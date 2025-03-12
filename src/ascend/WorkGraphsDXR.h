@@ -107,4 +107,6 @@ private:
 
 	CD3DX12_VIEWPORT m_viewport;
 	CD3DX12_RECT m_scissorRect;
+
+	XMFLOAT3 lightgui;
 };
